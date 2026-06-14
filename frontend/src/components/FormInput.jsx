@@ -180,20 +180,31 @@ function FormInput({ onDataSaved, existingData = [] }) {
           </select>
         </div>
         
-        {/* 🟢 PERBAIKAN UTAMA: Elemen Dropdown Defect dibuat permanen, hanya dikunci/disabled jika hasilnya OK */}
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-          <label style={{ ...labelStyle, color: isNg ? "#b85c65" : "#6c757d" }}>JENIS DEFECT:</label>
-          <select value={defect} onChange={(e) => setDefect(e.target.value)} required style={{ ...selectStyle, backgroundColor: isNg ? "white" : "#f8f9fa", color: isNg ? "#2b303a" : "#6c757d" }} disabled={!isNg}>
-            {!isNg ? (
-              <option value="APPROVE">APPROVE (DATA OK)</option>
-            ) : (
-              <>
-                <option value="">-- Pilih Jenis Defect --</option>
-                {DEFECT_OPTIONS.map((opt, index) => ( <option key={index} value={opt}>{opt}</option> ))}
-              </>
-            )}
-          </select>
-        </div>
+  <label style={{ ...labelStyle, color: isNg ? "#b85c65" : "#6c757d" }}>JENIS DEFECT:</label>
+  <select 
+    value={defect} 
+    onChange={(e) => setDefect(e.target.value)} 
+    required 
+    style={{ 
+      ...selectStyle, 
+      backgroundColor: isNg ? "white" : "#f8f9fa", 
+      color: isNg ? "#2b303a" : "#6c757d" 
+    }}
+  >
+    {/* Jika OK, tampilkan APPROVE, jika NG tampilkan daftar defect */}
+    {hasil === "OK" ? (
+      <option value="APPROVE">APPROVE (DATA OK)</option>
+    ) : (
+      <>
+        <option value="">-- Pilih Jenis Defect --</option>
+        {DEFECT_OPTIONS.map((opt, index) => ( 
+          <option key={index} value={opt}>{opt}</option> 
+        ))}
+      </>
+    )}
+  </select>
+</div>
 
         <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
           <button type="submit" style={{ ...btnSubmitStyle, backgroundColor: isEditMode ? "#2563eb" : isLockedBySystem ? "#b91c1c" : "#1e293b", flex: 2 }}>{isEditMode ? "Update Data Terkini" : isLockedBySystem ? `Simpan Sebagai Trial Ke-${trial}` : "Simpan Data Baru"}</button>
