@@ -39,7 +39,7 @@ function App() {
    //     setFilteredData(res.data);
    const fetchDataDariBackend = useCallback(() => {
     axios.get("/api/trial") 
-      .then((res) => {
+      .then((res) => {  
         setRawData(res.data);
 
         const projects = new Set();
