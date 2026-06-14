@@ -28,9 +28,9 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
   const [tanggalInput, setTanggalInput] = useState(getHariIni());
 
- useEffect(() => {
-    // Pengaman: Jika input profil kosong atau database dari sheet belum termuat
-    if (!profil.trim() || existingData.length === 0) {
+  useEffect(() => {
+    // 1. PENGAMAN AWAL
+    if (!profil || !profil.trim() || existingData.length === 0) {
       setIsEditMode(false);
       setIsLockedBySystem(false);
       setTargetId(null);
@@ -38,26 +38,25 @@ function FormInput({ onDataSaved, existingData = [] }) {
     }
 
     const profilClean = profil.trim().toUpperCase();
+    const trialClean = String(trial).trim();
 
-    // 1. CEK MODE EDIT (Exact Match - Mengakomodasi Data OK & NG)
+    // 2. DETEKSI MODE EDIT (Exact Match & Normalisasi Tipe Data)
+    // Ditambahkan syarat trialClean !== "" agar tidak memicu edit saat kolom trial masih kosong
     const dataLama = existingData.find(item => {
       const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
       const trialDB = item.trial ? String(item.trial).trim() : "";
-      const trialInput = String(trial).trim();
-
-      return profilDB === profilClean && trialDB === trialInput;
+      return profilDB === profilClean && trialDB === trialClean && trialClean !== "";
     });
 
     if (dataLama) {
-      setTargetId(dataLama.id); 
+      setTargetId(String(dataLama.id)); // Dikunci menjadi tipe String agar rute API aman
       setIsLockedBySystem(false); 
       
-      // 🟢 PERBAIKAN: Kunci status mode edit terlebih dahulu sebelum mengubah state kondisional hasil/defect
       if (!isEditMode) {
         setIsEditMode(true);
         setProject(dataLama.project || "");
         
-        // Ambil status asli dari Google Sheets
+        // Normalisasi teks hasil dari spreadsheet (mengantisipasi tulisan OK / APPROVE)
         const statusSpreedsheet = dataLama.hasil?.toUpperCase() === "OK" || dataLama.hasil?.toUpperCase() === "APPROVE" ? "OK" : "NG";
         setHasil(statusSpreedsheet);
         setIsNg(statusSpreedsheet !== "OK");
@@ -67,22 +66,21 @@ function FormInput({ onDataSaved, existingData = [] }) {
       return; 
     }
 
-    // 2. LOGIKA POKA-YOKE AUTO-INCREMENT (Hanya mengunci jika data terakhir NG)
-    if (!isManualBypass) {
+    // 3. LOGIKA POKA-YOKE AUTO-INCREMENT (Hanya mengunci jika uji coba terakhir REJECT/NG)
+    if (!isManualBypass && !dataLama) {
       const riwayatProfil = existingData.filter(item => {
         const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
         return profilDB === profilClean;
       });
 
-      if (riwayatProfil.length > 0 && !isEditMode) {
+      if (riwayatProfil.length > 0) {
         const semuaNomorTrial = riwayatProfil.map(x => Number(x.trial) || 0);
         const trialTertinggi = Math.max(...semuaNomorTrial);
         
         const dataTrialTerakhir = riwayatProfil.find(x => Number(x.trial) === trialTertinggi);
         const statusTerakhir = dataTrialTerakhir?.hasil?.trim().toUpperCase();
 
-        // Poka-yoke aktif HANYA jika trial terakhir REJECT/NG
-        if ((statusTerakhir === "NG") && !trial) {
+        if (statusTerakhir === "NG" && !trial) {
           setTrial(trialTertinggi + 1); 
           setIsLockedBySystem(true);    
           setProject(dataTrialTerakhir.project || "");
@@ -91,9 +89,10 @@ function FormInput({ onDataSaved, existingData = [] }) {
       }
     }
 
-    // Jika data tidak ditemukan di database dan sistem tidak sedang melakukan auto-increment
+    // 4. RESET STATE JIKA INPUT COCOK TIBA-TIBA DIHAPUS OLEH OPERATOR
     if (!dataLama && !isLockedBySystem) {
       setIsEditMode(false);
+      setTargetId(null);
     }
   }, [profil, trial, existingData, isManualBypass, isEditMode]);
 
@@ -130,7 +129,6 @@ function FormInput({ onDataSaved, existingData = [] }) {
     };
 
     if (isEditMode && targetId) {
-      // Endpoint update data baris lama
       axios.put(`/api/trial/${targetId}`, formData)
         .then(() => {
           alert(`🎉 PROFIL BERHASIL DI-EDIT PADA BARIS #${targetId}!`);
@@ -142,7 +140,6 @@ function FormInput({ onDataSaved, existingData = [] }) {
           alert("Gagal memperbarui data lama di Google Sheets!");
         });
     } else {
-      // Endpoint kirim data baris baru
       axios.post("/api/trial", formData)
         .then(() => {
           alert(`🟢 Data Baru Profil ${profil.toUpperCase()} Berhasil Disimpan!`);
