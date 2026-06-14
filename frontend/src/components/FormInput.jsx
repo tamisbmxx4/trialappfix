@@ -77,7 +77,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
       setTargetId(dataLama.id); 
       setIsLockedBySystem(false); 
       
-      // 🟢 PERBAIKAN: Kunci status mode edit terlebih dahulu sebelum mengubah state kondisional hasil/defect
+      // ✅ PERBAIKAN: Semua data (OK maupun NG) bisa diedit
       if (!isEditMode) {
         setIsEditMode(true);
         setProject(dataLama.project || "");
