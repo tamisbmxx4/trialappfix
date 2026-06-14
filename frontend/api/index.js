@@ -2,10 +2,11 @@ const express = require("express");
 const cors = require("cors");
 const { GoogleSpreadsheet } = require("google-spreadsheet");
 const { JWT } = require("google-auth-library");
+
+// 🟢 PERBAIKAN: Membaca credentials secara dinamis (Lokal / Vercel Online)
 const credentials = process.env.GOOGLE_CREDENTIALS 
   ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
   : require('./credentials.json');
-//const creds = require("./credentials.json");
 
 const SPREADSHEET_ID = "1J4wCo8eD0BUEwkvHGNmeGMBiXwKoaRe5VkuVNridvvU";
 
@@ -14,10 +15,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Inisialisasi Auth Google API
+// 🟢 PERBAIKAN: Mengubah 'creds' menjadi 'credentials' agar singkron dengan baris atas
 const serviceAccountAuth = new JWT({
-    email: creds.client_email,
-    key: creds.private_key,
+    email: credentials.client_email,
+    key: credentials.private_key,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
@@ -40,7 +41,7 @@ app.post('/api/trial', async (req, res) => {
     }
 });
 
-// 2. FUNGSI UNTUK MEMBACA DATA (GET) -> Sekarang menyertakan ID Baris Google Sheets
+// 2. FUNGSI UNTUK MEMBACA DATA (GET)
 app.get("/api/trial", async (req, res) => {
     try {
         const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
@@ -51,7 +52,7 @@ app.get("/api/trial", async (req, res) => {
         const data = rows.map(row => {
             const raw = row._rawData || [];
             return {
-                id: row.rowNumber, // 🌟 MENJADI ID UNIK (Nomor Baris di Google Sheets)
+                id: row.rowNumber, // Nomor Baris di Google Sheets sebagai ID unik
                 tanggal: raw[0] ? raw[0].trim() : "",
                 project: raw[1] ? raw[1].trim() : "", 
                 profil:  raw[2] ? raw[2].trim() : "",
@@ -68,9 +69,7 @@ app.get("/api/trial", async (req, res) => {
     }
 });
 
-// 🌟 3. FUNGSI BARU: UNTUK MENGEDIT/UPDATE DATA BERDASARKAN NOMOR BARIS (PUT)
-// Gantilah bagian isi app.put di backend Anda dengan logika berbasis objek kolom ini:
-// GANTI SELEURUH BLOK app.put DI SERVER.JS ANDA DENGAN INI:
+// 3. FUNGSI UNTUK MENGEDIT/UPDATE DATA BERDASARKAN NOMOR BARIS (PUT)
 app.put('/api/trial/:rowNumber', async (req, res) => {
     try {
         const { rowNumber } = req.params;
@@ -81,7 +80,7 @@ app.put('/api/trial/:rowNumber', async (req, res) => {
         const sheet = doc.sheetsByIndex[0];
         const rows = await sheet.getRows();
 
-        // Cari baris Google Sheets yang nomor barisnya cocok dengan target dari React
+        // Cari baris Google Sheets yang cocok dengan nomor baris target
         const targetRow = rows.find(r => String(r.rowNumber) === String(rowNumber));
 
         if (!targetRow) {
@@ -89,7 +88,7 @@ app.put('/api/trial/:rowNumber', async (req, res) => {
             return res.status(404).json({ error: "Data lama tidak ditemukan di Google Sheets!" });
         }
 
-        // 🌟 TEKNIK UPDATE PALING AMAN: Mengisi berdasarkan urutan kolom Sheet (A, B, C, D, E, F)
+        // Update data pada array baris
         targetRow._rawData[0] = tanggal;
         targetRow._rawData[1] = project;
         targetRow._rawData[2] = profil;
@@ -97,10 +96,10 @@ app.put('/api/trial/:rowNumber', async (req, res) => {
         targetRow._rawData[4] = hasil;
         targetRow._rawData[5] = defect;
 
-        // Commit perubahan langsung ke baris yang sama
+        // Simpan perubahan kembali ke Google Sheets
         await targetRow.save();
 
-        console.log(`🎉 BERHASIL MENIMPA DATA! Baris #${rowNumber} di Google Sheets telah diperbarui.`);
+        console.log(`🎉 BERHASIL MENIMPA DATA! Baris #${rowNumber} telah diperbarui.`);
         res.json({ message: "Data lama berhasil ditimpa!" });
     } catch (err) {
         console.error("🛑 Gagal mengupdate Google Sheets:", err.message);
@@ -108,7 +107,5 @@ app.put('/api/trial/:rowNumber', async (req, res) => {
     }
 });
 
-module.exports = app; // ✨ WAJIB ditambahkan agar dibaca oleh Vercel
-//app.listen(3000, () => {
- //   console.log("Server berjalan di port 3000");
-//});
+// ✨ Ekspor modul untuk sistem Serverless Vercel
+module.exports = app;
