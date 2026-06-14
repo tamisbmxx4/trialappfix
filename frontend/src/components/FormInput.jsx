@@ -263,8 +263,33 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={labelStyle}>NAMA PROJECT:</label><input type="text" value={project} onChange={(e) => setProject(e.target.value)} required style={inputStyle} /></div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={labelStyle}>STATUS HASIL:</label><select value={hasil} required style={selectStyle} onChange={(e) => { setHasil(e.target.value); setIsNg(e.target.value === "NG"); }}><option value="NG">NG (REJECT)</option><option value="OK">OK (APPROVE)</option></select></div>
-
+        {/* 🟢 GANTI BAGIAN INI DENGAN KODE DI BAWAH */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+          <label style={{ ...labelStyle, color: isNg ? "#b85c65" : "#6c757d" }}>JENIS DEFECT:</label>
+          <select 
+            value={isNg ? defect : "APPROVE"} 
+            onChange={(e) => setDefect(e.target.value)} 
+            disabled={!isNg}
+            style={{ 
+              ...selectStyle, 
+              backgroundColor: isNg ? "white" : "#f8f9fa", 
+              color: isNg ? "#2b303a" : "#6c757d",
+              cursor: isNg ? "pointer" : "not-allowed"
+            }}
+          >
+            {!isNg ? (
+              <option value="APPROVE">APPROVE (DATA OK)</option>
+            ) : (
+              <>
+                <option value="">-- Pilih Jenis Defect --</option>
+                {DEFECT_OPTIONS.map((opt, index) => (
+                  <option key={index} value={opt}>{opt}</option>
+                ))}
+              </>
+            )}
+          </select>
+        </div>
+     
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={{ ...labelStyle, color: isNg ? "#b85c65" : "#495057" }}>JENIS DEFECT:</label>{isNg ? (<select value={defect} onChange={(e) => setDefect(e.target.value)} required style={selectStyle}><option value="">-- Pilih Jenis Defect --</option>{DEFECT_OPTIONS.map((opt, index) => (<option key={index} value={opt}>{opt}</option>))}</select>) : (<input type="text" value="APPROVE" disabled style={{ ...inputStyle, backgroundColor: "#f8f9fa", color: "#6c757d" }} />)}</div>
 
         <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
@@ -284,8 +309,6 @@ function FormInput({ onDataSaved, existingData = [] }) {
   );
 
 }
-
-
 
 const labelStyle = { fontSize: "11px", fontWeight: "700", color: "#475569" };
 const inputStyle = { padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", width: "100%", boxSizing: "border-box" };
