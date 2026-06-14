@@ -8,7 +8,7 @@ import ChartProfil from "./components/ChartProfil";
 import FormInput from "./components/FormInput"; 
 import "./App.css"; 
 
-const GLOBAL_PASSWORD = "12345678"; 
+const GLOBAL_PASSWORD = "XXXXXXXXX"; 
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -31,7 +31,7 @@ function App() {
   const [tableEndDate, setTableEndDate] = useState("");
   const [filterTrialTerbanyak, setFilterTrialTerbanyak] = useState(false);
 
-  // 🟢 1. FUNGSI AMBIL DATA (Ditarik keluar agar bisa dipanggil ulang setelah Edit/Simpan)
+  // 1. FUNGSI AMBIL DATA
   const fetchDataDariBackend = useCallback(() => {
     axios.get("http://localhost:3000/api/trial") 
       .then((res) => {
@@ -60,10 +60,11 @@ function App() {
     }
   }, [isAuthenticated, fetchDataDariBackend]);
 
-  // 2. LOGIKA FILTER GLOBAL & NORMALISASI TANGGAL
+  // 2. LOGIKA FILTER GLOBAL (Hanya untuk Project & Normalisasi Format Teks Tanggal)
   useEffect(() => {
     let baseData = rawData;
 
+    // Filter berdasarkan Project Utama (Kiri Atas)
     if (selectedProject !== "ALL") {
       baseData = rawData.filter(item => {
         const pName = item.project && item.project.trim() !== "" ? item.project.trim() : "Project Lama";
@@ -71,6 +72,7 @@ function App() {
       });
     }
 
+    // Normalisasi teks penulisan bulan dari database
     const cleanedBaseData = baseData.map(item => {
       if (item && item.tanggal) {
         let formattedDate = String(item.tanggal).toLowerCase()
@@ -85,6 +87,7 @@ function App() {
 
     setFilteredData(cleanedBaseData);
 
+    // Olah data unik untuk keperluan chart profil
     const uniqueDataMap = new Map();
     cleanedBaseData.forEach(item => {
       if (item && item.profil) {
@@ -94,6 +97,7 @@ function App() {
     });
     setChartData(Array.from(uniqueDataMap.values()));
 
+    // Reset filter individual tabel ketika ganti project utama agar tidak tabrakan
     setSearchQuery("");
     setTableFilterHasil("ALL");
     setTableFilterDefect("ALL");
@@ -102,32 +106,70 @@ function App() {
     setFilterTrialTerbanyak(false);
   }, [selectedProject, rawData]);
 
-  // 3. LOGIKA FILTER BERLAPIS PADA TABEL LOG
+  // 3. LOGIKA FILTER BERLAPIS PADA TABEL LOG (Termasuk Perbaikan Filter Tanggal Akurat)
   const dataHasilSearch = filteredData.filter(item => {
     const searchLower = searchQuery.toLowerCase();
     
     const statusHasil = item.hasil ? String(item.hasil).trim().toUpperCase() : "";
     const defectHasil = item.defect ? String(item.defect).trim().toUpperCase() : "";
-    const itemDate = item.tanggal ? String(item.tanggal).trim() : "";
+    const itemDateStr = item.tanggal ? String(item.tanggal).trim() : "";
 
+    // A. Filter Pencarian global teks
     const cocokSearch = (
+      !searchQuery ||
       (item.profil && String(item.profil).toLowerCase().includes(searchLower)) ||
       (item.defect && String(item.defect).toLowerCase().includes(searchLower)) ||
       (item.hasil && String(item.hasil).toLowerCase().includes(searchLower)) ||
       (item.tanggal && String(item.tanggal).toLowerCase().includes(searchLower))
     );
 
+    // B. Filter Dropdown Status OK/NG
     let cocokHasil = true;
     if (tableFilterHasil === "OK") cocokHasil = (statusHasil === "OK" || statusHasil === "APPROVE");
     if (tableFilterHasil === "NG") cocokHasil = (statusHasil === "NG");
 
+    // C. Filter Dropdown Jenis Defect
     let cocokDefect = true;
     if (tableFilterDefect !== "ALL") cocokDefect = (defectHasil === tableFilterDefect);
 
+    // D. Filter Rentang Tanggal yang Akurat (Mengatasi Format Masalah Kombinasi)
     let cocokTanggal = true;
-    if (tableStartDate && itemDate) cocokTanggal = cocokTanggal && (itemDate >= tableStartDate);
-    if (tableEndDate && itemDate) cocokTanggal = cocokTanggal && (itemDate <= tableEndDate);
+    if (itemDateStr) {
+      let dateData;
 
+      // Cek jika format database adalah DD-MM-YYYY (Contoh: 14-06-2026)
+      const bagianTanggal = itemDateStr.split("-");
+      if (bagianTanggal.length === 3 && bagianTanggal[0].length === 2) {
+        // Balik urutannya menjadi format standar YYYY-MM-DD agar bisa dibaca JavaScript
+        dateData = new Date(`${bagianTanggal[2]}-${bagianTanggal[1]}-${bagianTanggal[0]}`);
+      } else {
+        // Jika format database sudah standar YYYY-MM-DD (Contoh: 2026-06-14)
+        dateData = new Date(itemDateStr);
+      }
+
+      // Jalankan validasi objek tanggal
+      if (!isNaN(dateData.getTime())) {
+        dateData.setHours(0, 0, 0, 0);
+
+        if (tableStartDate) {
+          const dateMulai = new Date(tableStartDate);
+          dateMulai.setHours(0, 0, 0, 0);
+          cocokTanggal = cocokTanggal && (dateData >= dateMulai);
+        }
+        if (tableEndDate) {
+          const dateSelesai = new Date(tableEndDate);
+          dateSelesai.setHours(0, 0, 0, 0);
+          cocokTanggal = cocokTanggal && (dateData <= dateSelesai);
+        }
+      } else {
+        // Pengaman: Jika parsing gagal, tampilkan data hanya jika filter tanggal kosong
+        cocokTanggal = !tableStartDate && !tableEndDate;
+      }
+    } else if (tableStartDate || tableEndDate) {
+      cocokTanggal = false; 
+    }
+
+    // E. Filter Checkbox Trial Tertinggi
     let cocokTrialTerbanyak = true;
     if (filterTrialTerbanyak && item.profil) {
       const semuaTrialProfilIni = filteredData
@@ -338,7 +380,6 @@ function App() {
       )}
 
       {/* VIEW INPUT FORM */}
-      {/* 🟢 2. SINKRONISASI DI SINI: Alirkan properti data utama ke FormInput */}
       {activeMenu === "input_form" && (
         <FormInput 
           onDataSaved={fetchDataDariBackend} 
