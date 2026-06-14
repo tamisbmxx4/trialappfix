@@ -165,7 +165,18 @@ function App() {
       cocokTrialTerbanyak = (parseInt(item.trial) || 0) === maxTrial;
     }
 
-    return cocokSearch && cocokHasil && cocokDefect && cocokTanggal && cocokTrialTerbanyak;
+   return cocokSearch && cocokHasil && cocokDefect && cocokTanggal && cocokTrialTerbanyak;
+  }).sort((a, b) => {
+    const parseDate = (str) => {
+      if (!str) return 0;
+      const bagian = String(str).trim().split("-");
+      if (bagian.length === 3 && bagian[0].length === 2) {
+        // Format DD-MM-YYYY
+        return new Date(`${bagian[2]}-${bagian[1]}-${bagian[0]}`).getTime();
+      }
+      return new Date(str).getTime();
+    };
+    return parseDate(b.tanggal) - parseDate(a.tanggal); // Terbaru di atas
   });
 
   const handleLogout = () => {

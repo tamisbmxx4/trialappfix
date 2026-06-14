@@ -149,7 +149,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px" }}>
             <label style={labelStyle}>NOMOR PROFIL:</label>
             <input
-              type="text" value={profil} required placeholder="Contoh: 9K"
+              type="text" value={profil} required placeholder="Contoh: 9K, 3K"
               onChange={(e) => { setProfil(e.target.value); setIsManualBypass(false); setMode("input"); setTrial(""); setLastTrialData(null); }}
               style={inputStyle}
             />
