@@ -22,11 +22,13 @@ app.post('/api/trial', async (req, res) => {
         const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
         
         // Autentikasi gaya Versi 3
-        await doc.useServiceAccountAuth({
-            client_email: credentials.client_email,
-            private_key: credentials.private_key,
-        });
+        // GANTI bagian doc.useServiceAccountAuth di dalam app.get, app.post, dan app.put dengan ini:
 
+await doc.useServiceAccountAuth({
+    client_email: credentials.client_email,
+    // Tambahkan .replace(/\\n/g, '\n') untuk memperbaiki format enter di Vercel
+    private_key: credentials.private_key.replace(/\\n/g, '\n'),
+});
         await doc.loadInfo();
         const sheet = doc.sheetsByIndex[0];
 
