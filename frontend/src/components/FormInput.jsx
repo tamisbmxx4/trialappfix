@@ -28,7 +28,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
   const [tanggalInput, setTanggalInput] = useState(getHariIni());
 
-  useEffect(() => {
+ useEffect(() => {
     // Pengaman: Jika input profil kosong atau database dari sheet belum termuat
     if (!profil.trim() || existingData.length === 0) {
       setIsEditMode(false);
@@ -39,13 +39,12 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
     const profilClean = profil.trim().toUpperCase();
 
-    // 1. CEK MODE EDIT (Wajib Sama Persis / Exact Match)
+    // 1. CEK MODE EDIT (Exact Match - Mengakomodasi Data OK & NG)
     const dataLama = existingData.find(item => {
       const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
       const trialDB = item.trial ? String(item.trial).trim() : "";
       const trialInput = String(trial).trim();
 
-      // Menggunakan operator === agar membedakan "9K" dengan "9K-123213" secara mutlak
       return profilDB === profilClean && trialDB === trialInput;
     });
 
@@ -53,21 +52,23 @@ function FormInput({ onDataSaved, existingData = [] }) {
       setTargetId(dataLama.id); 
       setIsLockedBySystem(false); 
       
-      // Pengaman loop rendering: Hanya isi state jika mode edit belum aktif sebelumnya
+      // 🟢 PERBAIKAN: Kunci status mode edit terlebih dahulu sebelum mengubah state kondisional hasil/defect
       if (!isEditMode) {
         setIsEditMode(true);
         setProject(dataLama.project || "");
-        setHasil(dataLama.hasil?.toUpperCase() === "OK" ? "OK" : "NG");
-        setIsNg(dataLama.hasil?.toUpperCase() !== "OK");
+        
+        // Ambil status asli dari Google Sheets
+        const statusSpreedsheet = dataLama.hasil?.toUpperCase() === "OK" || dataLama.hasil?.toUpperCase() === "APPROVE" ? "OK" : "NG";
+        setHasil(statusSpreedsheet);
+        setIsNg(statusSpreedsheet !== "OK");
         setDefect(dataLama.defect || "");
         if (dataLama.tanggal) setTanggalInput(dataLama.tanggal);
       }
       return; 
     }
 
-    // 2. LOGIKA POKA-YOKE AUTO-INCREMENT (Exact Match)
+    // 2. LOGIKA POKA-YOKE AUTO-INCREMENT (Hanya mengunci jika data terakhir NG)
     if (!isManualBypass) {
-      // Filter riwayat yang nama profilnya serupa dan sama persis
       const riwayatProfil = existingData.filter(item => {
         const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
         return profilDB === profilClean;
@@ -80,8 +81,8 @@ function FormInput({ onDataSaved, existingData = [] }) {
         const dataTrialTerakhir = riwayatProfil.find(x => Number(x.trial) === trialTertinggi);
         const statusTerakhir = dataTrialTerakhir?.hasil?.trim().toUpperCase();
 
-        // Jika status uji coba terakhir adalah NG dan kolom trial kosong, naikkan otomatis
-        if (statusTerakhir === "NG" && !trial) {
+        // Poka-yoke aktif HANYA jika trial terakhir REJECT/NG
+        if ((statusTerakhir === "NG") && !trial) {
           setTrial(trialTertinggi + 1); 
           setIsLockedBySystem(true);    
           setProject(dataTrialTerakhir.project || "");
@@ -90,11 +91,11 @@ function FormInput({ onDataSaved, existingData = [] }) {
       }
     }
 
-    // Jika data tidak ditemukan sama persis dan sistem tidak sedang mengunci input
+    // Jika data tidak ditemukan di database dan sistem tidak sedang melakukan auto-increment
     if (!dataLama && !isLockedBySystem) {
       setIsEditMode(false);
     }
-  }, [profil, trial, existingData, isManualBypass, isEditMode]); 
+  }, [profil, trial, existingData, isManualBypass, isEditMode]);
 
   const handleBukaGembok = () => {
     setIsManualBypass(true);     
