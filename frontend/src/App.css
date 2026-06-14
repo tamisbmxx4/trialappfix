@@ -1,0 +1,439 @@
+/* @import font standar industri untuk dashboard data */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* --- PRINT MEDIA STYLING --- */
+@media print { 
+  @page { size: A4 landscape; margin: 10mm; } 
+  .no-print { display: none !important; } 
+  body { background-color: #ffffff !important; } 
+  .card-pdf { box-shadow: none !important; border: 1px solid #dcdcdc !important; page-break-inside: avoid; background-color: #ffffff !important; } 
+  .table-container { max-height: none !important; overflow-y: visible !important; border: none !important; }
+  th { position: static !important; background-color: #343a40 !important; color: #ffffff !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } 
+}
+
+/* --- CORE LAYOUT STYLING --- */
+.app-container {
+  background-color: #f8fafc; /* Warna background abu-abu clean industri */
+  min-height: 100vh;
+  padding: 24px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.main-title {
+  text-align: center;
+  margin-bottom: 25px;
+  color: #0f172a; /* Slate 900 - warna teks industri modern, bukan hitam pekat */
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.025em; /* Efek merapatkan huruf khas font industri */
+  text-transform: uppercase;
+}
+
+.calc-notice {
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+  padding: 15px;
+  background-color: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* --- NAVIGATION & DROPDOWNS --- */
+.nav-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1400px;
+  margin: 0 auto 25px auto;
+}
+
+.tab-wrapper {
+  display: flex;
+  gap: 4px;
+  background-color: #e2e8f0;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.tab-btn-active {
+  background-color: white;
+  color: #0f172a;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.tab-btn-inactive {
+  background-color: transparent;
+  color: #64748b;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.tab-btn-inactive:hover {
+  color: #0f172a;
+}
+
+.proj-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.proj-select-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.custom-select {
+  font-family: 'Inter', sans-serif;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background-color: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  outline: none;
+  cursor: pointer;
+}
+
+.custom-select:focus {
+  border-color: #94a3b8;
+}
+
+.btn-print {
+  font-family: 'Inter', sans-serif;
+  background-color: #1e293b; /* Slate 800 */
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn-logout {
+  font-family: 'Inter', sans-serif;
+  background-color: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* --- DASHBOARD GRAPH CARDS --- */
+.dashboard-grid {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 20px;
+  flex-wrap: wrap;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.card-chart-sm, .card-chart-md, .card-chart-lg, .card-chart-line {
+  background-color: white;
+  border-radius: 8px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.card-chart-sm { flex: 1 1 300px; max-width: 380px; height: 380px; }
+.card-chart-md { flex: 1 1 320px; max-width: 400px; height: 380px; }
+.card-chart-lg { flex: 1 1 480px; max-width: 560px; height: 380px; }
+.card-chart-line { max-width: 1350px; height: 380px; margin: 0 auto; }
+
+/* --- TABLE VIEW STYLING --- */
+.table-view-card {
+  max-width: 1350px;
+  margin: 0 auto;
+  background-color: white;
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.filter-bar {
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  background-color: #f8fafc;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-field label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.05em;
+}
+
+.filter-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  cursor: pointer;
+}
+
+.filter-checkbox-wrapper input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.filter-checkbox-label {
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 240px;
+}
+
+.search-field label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.05em;
+}
+
+.search-field input {
+  font-family: 'Inter', sans-serif;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.filter-info-row {
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f1f5f9;
+  padding: 10px 16px;
+  border-radius: 6px;
+}
+
+.filter-info-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.filter-info-count {
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.btn-reset-filter {
+  font-family: 'Inter', sans-serif;
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* --- DATA TABLE CORE ELEMENTS --- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 13px;
+}
+
+th {
+  background-color: #1e293b; /* Header tabel gelap solid khas sistem ERP */
+  color: #ffffff;
+  padding: 14px 12px;
+  text-align: left;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  font-variant-numeric: tabular-nums; /* Membuat susunan angka/trial lurus sejajar vertikal */
+}
+
+tr.row-even { background-color: #ffffff; }
+tr.row-odd { background-color: #f8fafc; }
+tr:hover { background-color: #f1f5f9; }
+
+.table-container {
+  max-height: 520px; 
+  overflow-y: auto;   
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+/* --- BADGES STATUS --- */
+.badge {
+  font-family: 'Inter', sans-serif;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 11px;
+  display: inline-block;
+  text-align: center;
+  min-width: 80px;
+  letter-spacing: 0.02em;
+}
+
+.badge-ok {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.badge-ng {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.empty-row-text {
+  text-align: center;
+  color: #94a3b8;
+  padding: 50px;
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* --- LOCK / SECURITY SCREEN --- */
+.login-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.9); /* Pekat khas industrial gate */
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.login-box {
+  background-color: white;
+  padding: 40px 35px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.login-box h2 {
+  font-family: 'Inter', sans-serif;
+  margin: 0 0 12px 0;
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-input {
+  font-family: 'Inter', sans-serif;
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.login-input:focus {
+  border-color: #64748b;
+}
+
+.login-error {
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.login-submit-btn {
+  font-family: 'Inter', sans-serif;
+  background-color: #0f172a;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.login-submit-btn:hover {
+  background-color: #1e293b;
+}
