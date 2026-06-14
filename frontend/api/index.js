@@ -1,9 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const { GoogleSpreadsheet } = require("google-spreadsheet");
-const { JWT } = require("google-auth-library");
 
-// Membaca credentials secara aman
+// Membaca credentials secara aman (Lokal / Vercel)
 const credentials = process.env.GOOGLE_CREDENTIALS 
   ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
   : require('./credentials.json');
@@ -14,24 +13,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Inisialisasi Google Auth JWT secara global
-const serviceAccountAuth = new JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-});
-
 // 1. FUNGSI UNTUK MENYIMPAN DATA BARU (POST)
 app.post('/api/trial', async (req, res) => {
     try {
         const { tanggal, project, profil, trial, hasil, defect } = req.body;
         
-        // PENTING: Masukkan serviceAccountAuth langsung sebagai parameter kedua (Wajib di v4)
-        const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
+        // Versi 3: Inisialisasi hanya membutuhkan ID Spreadsheet saja
+        const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
         
+        // Autentikasi gaya Versi 3
+        await doc.useServiceAccountAuth({
+            client_email: credentials.client_email,
+            private_key: credentials.private_key,
+        });
+
         await doc.loadInfo();
         const sheet = doc.sheetsByIndex[0];
 
+        // Simpan data ke baris baru
         await sheet.addRow([tanggal, project, profil, trial, hasil, defect]);
 
         console.log("🎉 Data baru berhasil ditulis ke Google Sheets:", req.body);
@@ -45,9 +44,14 @@ app.post('/api/trial', async (req, res) => {
 // 2. FUNGSI UNTUK MEMBACA DATA (GET)
 app.get("/api/trial", async (req, res) => {
     try {
-        // PENTING: Masukkan serviceAccountAuth langsung sebagai parameter kedua
-        const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
+        const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
         
+        // Autentikasi gaya Versi 3
+        await doc.useServiceAccountAuth({
+            client_email: credentials.client_email,
+            private_key: credentials.private_key,
+        });
+
         await doc.loadInfo();
         const sheet = doc.sheetsByIndex[0];
         const rows = await sheet.getRows();
@@ -55,7 +59,7 @@ app.get("/api/trial", async (req, res) => {
         const data = rows.map(row => {
             const raw = row._rawData || [];
             return {
-                id: row.rowNumber,
+                id: row.rowNumber, // Nomor Baris di Google Sheets sebagai ID unik
                 tanggal: raw[0] ? raw[0].trim() : "",
                 project: raw[1] ? raw[1].trim() : "", 
                 profil:  raw[2] ? raw[2].trim() : "",
@@ -72,17 +76,25 @@ app.get("/api/trial", async (req, res) => {
     }
 });
 
-// 3. FUNGSI UNTUK MENGEDIT/UPDATE DATA (PUT)
+// 3. FUNGSI UNTUK MENGEDIT/UPDATE DATA BERDASARKAN NOMOR BARIS (PUT)
 app.put('/api/trial/:rowNumber', async (req, res) => {
     try {
         const { rowNumber } = req.params;
         const { tanggal, project, profil, trial, hasil, defect } = req.body;
 
-        const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
+        const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
+        
+        // Autentikasi gaya Versi 3
+        await doc.useServiceAccountAuth({
+            client_email: credentials.client_email,
+            private_key: credentials.private_key,
+        });
+
         await doc.loadInfo();
         const sheet = doc.sheetsByIndex[0];
         const rows = await sheet.getRows();
 
+        // Cari baris Google Sheets yang cocok dengan nomor baris target
         const targetRow = rows.find(r => String(r.rowNumber) === String(rowNumber));
 
         if (!targetRow) {
