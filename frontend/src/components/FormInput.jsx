@@ -117,7 +117,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
     };
 
     if (isEditMode && targetId) {
-      axios.put(`http://localhost:3000/api/trial/${targetId}`, formData)
+      axios.put("/api/trial", formData)
         .then(() => {
           alert(`PROFIL BERHASIL DI EDIT!`);
           resetFormTotal();
@@ -128,7 +128,8 @@ function FormInput({ onDataSaved, existingData = [] }) {
           alert("Gagal memperbarui data lama!");
         });
     } else {
-      axios.post("http://localhost:3000/api/trial", formData)
+      // KODE BARU YANG BENAR:
+        axios.post("/api/trial", formData)
         .then(() => {
           alert(`Data Baru Profil ${profil} Berhasil Disimpan!`);
           resetFormTotal();
