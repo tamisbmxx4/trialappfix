@@ -3,7 +3,7 @@ const cors = require("cors");
 const { GoogleSpreadsheet } = require("google-spreadsheet");
 const { JWT } = require("google-auth-library");
 
-// 🟢 PERBAIKAN: Membaca credentials secara dinamis (Lokal / Vercel Online)
+// Membaca credentials secara aman
 const credentials = process.env.GOOGLE_CREDENTIALS 
   ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
   : require('./credentials.json');
@@ -11,11 +11,10 @@ const credentials = process.env.GOOGLE_CREDENTIALS
 const SPREADSHEET_ID = "1J4wCo8eD0BUEwkvHGNmeGMBiXwKoaRe5VkuVNridvvU";
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-// 🟢 PERBAIKAN: Mengubah 'creds' menjadi 'credentials' agar singkron dengan baris atas
+// Inisialisasi Google Auth JWT secara global
 const serviceAccountAuth = new JWT({
     email: credentials.client_email,
     key: credentials.private_key,
@@ -26,15 +25,17 @@ const serviceAccountAuth = new JWT({
 app.post('/api/trial', async (req, res) => {
     try {
         const { tanggal, project, profil, trial, hasil, defect } = req.body;
+        
+        // PENTING: Masukkan serviceAccountAuth langsung sebagai parameter kedua (Wajib di v4)
         const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
+        
         await doc.loadInfo();
         const sheet = doc.sheetsByIndex[0];
 
-        // Simpan data ke baris baru
         await sheet.addRow([tanggal, project, profil, trial, hasil, defect]);
 
         console.log("🎉 Data baru berhasil ditulis ke Google Sheets:", req.body);
-        res.status(201).json({ message: "Data berhasil disimpan ke Google Spreadsheet!" });
+        res.status(201).json({ message: "Data berhasil disimpan!" });
     } catch (err) {
         console.error("🛑 Gagal menulis ke Google Sheets:", err.message);
         res.status(500).json({ error: "Gagal menyimpan data", details: err.message });
@@ -44,7 +45,9 @@ app.post('/api/trial', async (req, res) => {
 // 2. FUNGSI UNTUK MEMBACA DATA (GET)
 app.get("/api/trial", async (req, res) => {
     try {
+        // PENTING: Masukkan serviceAccountAuth langsung sebagai parameter kedua
         const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
+        
         await doc.loadInfo();
         const sheet = doc.sheetsByIndex[0];
         const rows = await sheet.getRows();
@@ -52,7 +55,7 @@ app.get("/api/trial", async (req, res) => {
         const data = rows.map(row => {
             const raw = row._rawData || [];
             return {
-                id: row.rowNumber, // Nomor Baris di Google Sheets sebagai ID unik
+                id: row.rowNumber,
                 tanggal: raw[0] ? raw[0].trim() : "",
                 project: raw[1] ? raw[1].trim() : "", 
                 profil:  raw[2] ? raw[2].trim() : "",
@@ -69,7 +72,7 @@ app.get("/api/trial", async (req, res) => {
     }
 });
 
-// 3. FUNGSI UNTUK MENGEDIT/UPDATE DATA BERDASARKAN NOMOR BARIS (PUT)
+// 3. FUNGSI UNTUK MENGEDIT/UPDATE DATA (PUT)
 app.put('/api/trial/:rowNumber', async (req, res) => {
     try {
         const { rowNumber } = req.params;
@@ -80,15 +83,12 @@ app.put('/api/trial/:rowNumber', async (req, res) => {
         const sheet = doc.sheetsByIndex[0];
         const rows = await sheet.getRows();
 
-        // Cari baris Google Sheets yang cocok dengan nomor baris target
         const targetRow = rows.find(r => String(r.rowNumber) === String(rowNumber));
 
         if (!targetRow) {
-            console.log(`🛑 Baris #${rowNumber} tidak ditemukan!`);
-            return res.status(404).json({ error: "Data lama tidak ditemukan di Google Sheets!" });
+            return res.status(404).json({ error: "Data tidak ditemukan!" });
         }
 
-        // Update data pada array baris
         targetRow._rawData[0] = tanggal;
         targetRow._rawData[1] = project;
         targetRow._rawData[2] = profil;
@@ -96,16 +96,14 @@ app.put('/api/trial/:rowNumber', async (req, res) => {
         targetRow._rawData[4] = hasil;
         targetRow._rawData[5] = defect;
 
-        // Simpan perubahan kembali ke Google Sheets
         await targetRow.save();
 
-        console.log(`🎉 BERHASIL MENIMPA DATA! Baris #${rowNumber} telah diperbarui.`);
-        res.json({ message: "Data lama berhasil ditimpa!" });
+        console.log(`🎉 Baris #${rowNumber} berhasil diperbarui.`);
+        res.json({ message: "Data berhasil diperbarui!" });
     } catch (err) {
         console.error("🛑 Gagal mengupdate Google Sheets:", err.message);
         res.status(500).json({ error: "Gagal memperbarui data", details: err.message });
     }
 });
 
-// ✨ Ekspor modul untuk sistem Serverless Vercel
 module.exports = app;
