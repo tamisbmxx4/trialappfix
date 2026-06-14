@@ -29,7 +29,6 @@ function FormInput({ onDataSaved, existingData = [] }) {
   const [tanggalInput, setTanggalInput] = useState(getHariIni());
 
   useEffect(() => {
-    // 1. PENGAMAN AWAL
     if (!profil || !profil.trim() || existingData.length === 0) {
       setIsEditMode(false);
       setIsLockedBySystem(false);
@@ -40,8 +39,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
     const profilClean = profil.trim().toUpperCase();
     const trialClean = String(trial).trim();
 
-    // 2. DETEKSI MODE EDIT (Exact Match & Normalisasi Tipe Data)
-    // Ditambahkan syarat trialClean !== "" agar tidak memicu edit saat kolom trial masih kosong
+    // 1. CARI DATA LAMA (Mode Edit OK & NG)
     const dataLama = existingData.find(item => {
       const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
       const trialDB = item.trial ? String(item.trial).trim() : "";
@@ -49,24 +47,23 @@ function FormInput({ onDataSaved, existingData = [] }) {
     });
 
     if (dataLama) {
-      setTargetId(String(dataLama.id)); // Dikunci menjadi tipe String agar rute API aman
+      setTargetId(String(dataLama.id)); 
       setIsLockedBySystem(false); 
       
       if (!isEditMode) {
         setIsEditMode(true);
         setProject(dataLama.project || "");
         
-        // Normalisasi teks hasil dari spreadsheet (mengantisipasi tulisan OK / APPROVE)
-        const statusSpreedsheet = dataLama.hasil?.toUpperCase() === "OK" || dataLama.hasil?.toUpperCase() === "APPROVE" ? "OK" : "NG";
-        setHasil(statusSpreedsheet);
-        setIsNg(statusSpreedsheet !== "OK");
+        const statusAktual = dataLama.hasil?.toUpperCase() === "OK" || dataLama.hasil?.toUpperCase() === "APPROVE" ? "OK" : "NG";
+        setHasil(statusAktual);
+        setIsNg(statusAktual !== "OK");
         setDefect(dataLama.defect || "");
         if (dataLama.tanggal) setTanggalInput(dataLama.tanggal);
       }
       return; 
     }
 
-    // 3. LOGIKA POKA-YOKE AUTO-INCREMENT (Hanya mengunci jika uji coba terakhir REJECT/NG)
+    // 2. LOGIKA POKA-YOKE AUTO-INCREMENT (Hanya jika data terakhir NG)
     if (!isManualBypass && !dataLama) {
       const riwayatProfil = existingData.filter(item => {
         const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
@@ -89,12 +86,11 @@ function FormInput({ onDataSaved, existingData = [] }) {
       }
     }
 
-    // 4. RESET STATE JIKA INPUT COCOK TIBA-TIBA DIHAPUS OLEH OPERATOR
     if (!dataLama && !isLockedBySystem) {
       setIsEditMode(false);
       setTargetId(null);
     }
-  }, [profil, trial, existingData, isManualBypass, isEditMode]);
+  }, [profil, trial, existingData, isManualBypass, isEditMode]); 
 
   const handleBukaGembok = () => {
     setIsManualBypass(true);     
@@ -131,7 +127,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
     if (isEditMode && targetId) {
       axios.put(`/api/trial/${targetId}`, formData)
         .then(() => {
-          alert(`🎉 PROFIL BERHASIL DI-EDIT PADA BARIS #${targetId}!`);
+          alert(`🎉 DATA BERHASIL DI-EDIT PADA BARIS #${targetId}!`);
           resetFormTotal();
           if (onDataSaved) onDataSaved();
         })
@@ -156,7 +152,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", backgroundColor: "white", padding: "30px", borderRadius: "8px", border: "1px solid #e3e6ec", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", fontFamily: "'Inter', sans-serif" }}>
       <h2 style={{ margin: "0 0 20px 0", color: isEditMode ? "#2563eb" : isLockedBySystem ? "#b91c1c" : "#2b303a", fontSize: "16px", fontWeight: "700", borderBottom: "2px solid #f4f6f9", paddingBottom: "10px" }}>
-        {isEditMode ? `MODE EDIT: Mengoreksi Baris #${targetId} di Google Sheet` : isLockedBySystem ? "POKA-YOKE: Kelanjutan Uji Coba (Auto-Increment)" : "Input Hasil Trial Profil"}
+        {isEditMode ? `MODE EDIT AKTIF: Mengoreksi Baris #${targetId} di Google Sheet` : isLockedBySystem ? "POKA-YOKE: Kelanjutan Uji Coba (Auto-Increment)" : "Input Hasil Trial Profil"}
       </h2>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
         <div style={{ display: "flex", gap: "15px" }}>
@@ -169,12 +165,36 @@ function FormInput({ onDataSaved, existingData = [] }) {
             <input type="number" value={trial} onChange={(e) => setTrial(e.target.value)} required disabled={isLockedBySystem} style={{ ...inputStyle, backgroundColor: isLockedBySystem ? "#f1f5f9" : "white", fontWeight: isLockedBySystem ? "700" : "normal" }} />
           </div>
         </div>
+        
         {isLockedBySystem && <div style={{ fontSize: "12px", color: "#b91c1c", backgroundColor: "#fef2f2", padding: "10px", borderRadius: "6px", fontWeight: "600", border: "1px solid #fca5a5" }}>⚠️ SISTEM AUTOMATIC: Profil {profil.toUpperCase()} terakhir berstatus NG. Urutan otomatis naik ke Trial Ke-{trial} agar tidak menimpa data lama.</div>}
         {isEditMode && <div style={{ fontSize: "12px", color: "#2563eb", backgroundColor: "#eff6ff", padding: "10px", borderRadius: "6px", fontWeight: "600", border: "1px solid #bfdbfe" }}>ℹ️ MODE EDIT AKTIF: Anda mengubah data lama. Klik simpan untuk MENIMPA data lama di baris #{targetId}.</div>}
+        
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={labelStyle}>TANGGAL TRIAL:</label><input type="date" required value={tanggalInput} onChange={(e) => setTanggalInput(e.target.value)} style={inputStyle} /></div>
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={labelStyle}>NAMA PROJECT:</label><input type="text" value={project} onChange={(e) => setProject(e.target.value)} required style={inputStyle} /></div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={labelStyle}>STATUS HASIL:</label><select value={hasil} required style={selectStyle} onChange={(e) => { setHasil(e.target.value); setIsNg(e.target.value === "NG"); }}><option value="NG">NG (REJECT)</option><option value="OK">OK (APPROVE)</option></select></div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={{ ...labelStyle, color: isNg ? "#b85c65" : "#495057" }}>JENIS DEFECT:</label>{isNg ? ( <select value={defect} onChange={(e) => setDefect(e.target.value)} required style={selectStyle}><option value="">-- Pilih Jenis Defect --</option>{DEFECT_OPTIONS.map((opt, index) => ( <option key={index} value={opt}>{opt}</option> ))}</select> ) : ( <input type="text" value="APPROVE" disabled style={{ ...inputStyle, backgroundColor: "#f8f9fa", color: "#6c757d" }} /> )}</div>
+        
+        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+          <label style={labelStyle}>STATUS HASIL:</label>
+          <select value={hasil} required style={selectStyle} onChange={(e) => { setHasil(e.target.value); setIsNg(e.target.value === "NG"); if(e.target.value === "OK") setDefect("APPROVE"); else setDefect(""); }}>
+            <option value="NG">NG (REJECT)</option>
+            <option value="OK">OK (APPROVE)</option>
+          </select>
+        </div>
+        
+        {/* 🟢 PERBAIKAN UTAMA: Elemen Dropdown Defect dibuat permanen, hanya dikunci/disabled jika hasilnya OK */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+          <label style={{ ...labelStyle, color: isNg ? "#b85c65" : "#6c757d" }}>JENIS DEFECT:</label>
+          <select value={defect} onChange={(e) => setDefect(e.target.value)} required style={{ ...selectStyle, backgroundColor: isNg ? "white" : "#f8f9fa", color: isNg ? "#2b303a" : "#6c757d" }} disabled={!isNg}>
+            {!isNg ? (
+              <option value="APPROVE">APPROVE (DATA OK)</option>
+            ) : (
+              <>
+                <option value="">-- Pilih Jenis Defect --</option>
+                {DEFECT_OPTIONS.map((opt, index) => ( <option key={index} value={opt}>{opt}</option> ))}
+              </>
+            )}
+          </select>
+        </div>
+
         <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
           <button type="submit" style={{ ...btnSubmitStyle, backgroundColor: isEditMode ? "#2563eb" : isLockedBySystem ? "#b91c1c" : "#1e293b", flex: 2 }}>{isEditMode ? "Update Data Terkini" : isLockedBySystem ? `Simpan Sebagai Trial Ke-${trial}` : "Simpan Data Baru"}</button>
           {isLockedBySystem && <button type="button" onClick={handleBukaGembok} style={{ ...btnSubmitStyle, backgroundColor: "#64748b", flex: 1 }}>Edit Profil</button>}
