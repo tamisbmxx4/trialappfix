@@ -29,7 +29,8 @@ function FormInput({ onDataSaved, existingData = [] }) {
   const [tanggalInput, setTanggalInput] = useState(getHariIni());
 
   useEffect(() => {
-    if (!profil || existingData.length === 0) {
+    // Pengaman: Jika input profil kosong atau database dari sheet belum termuat
+    if (!profil.trim() || existingData.length === 0) {
       setIsEditMode(false);
       setIsLockedBySystem(false);
       setTargetId(null);
@@ -38,17 +39,21 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
     const profilClean = profil.trim().toUpperCase();
 
-    // 1. CEK MODE EDIT (Jika data lama ditemukan)
-    const dataLama = existingData.find(item => 
-      item.profil?.trim().toUpperCase() === profilClean && 
-      String(item.trial).trim() === String(trial).trim()
-    );
+    // 1. CEK MODE EDIT (Wajib Sama Persis / Exact Match)
+    const dataLama = existingData.find(item => {
+      const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
+      const trialDB = item.trial ? String(item.trial).trim() : "";
+      const trialInput = String(trial).trim();
+
+      // Menggunakan operator === agar membedakan "9K" dengan "9K-123213" secara mutlak
+      return profilDB === profilClean && trialDB === trialInput;
+    });
 
     if (dataLama) {
       setTargetId(dataLama.id); 
       setIsLockedBySystem(false); 
       
-      // Pengaman rendering loop: Hanya isi state form jika sebelumnya belum aktif mode edit
+      // Pengaman loop rendering: Hanya isi state jika mode edit belum aktif sebelumnya
       if (!isEditMode) {
         setIsEditMode(true);
         setProject(dataLama.project || "");
@@ -60,11 +65,13 @@ function FormInput({ onDataSaved, existingData = [] }) {
       return; 
     }
 
-    // 2. LOGIKA POKA-YOKE AUTO-INCREMENT
+    // 2. LOGIKA POKA-YOKE AUTO-INCREMENT (Exact Match)
     if (!isManualBypass) {
-      const riwayatProfil = existingData.filter(item => 
-        item.profil?.trim().toUpperCase() === profilClean
-      );
+      // Filter riwayat yang nama profilnya serupa dan sama persis
+      const riwayatProfil = existingData.filter(item => {
+        const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
+        return profilDB === profilClean;
+      });
 
       if (riwayatProfil.length > 0 && !isEditMode) {
         const semuaNomorTrial = riwayatProfil.map(x => Number(x.trial) || 0);
@@ -73,6 +80,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
         const dataTrialTerakhir = riwayatProfil.find(x => Number(x.trial) === trialTertinggi);
         const statusTerakhir = dataTrialTerakhir?.hasil?.trim().toUpperCase();
 
+        // Jika status uji coba terakhir adalah NG dan kolom trial kosong, naikkan otomatis
         if (statusTerakhir === "NG" && !trial) {
           setTrial(trialTertinggi + 1); 
           setIsLockedBySystem(true);    
@@ -82,6 +90,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
       }
     }
 
+    // Jika data tidak ditemukan sama persis dan sistem tidak sedang mengunci input
     if (!dataLama && !isLockedBySystem) {
       setIsEditMode(false);
     }
@@ -120,7 +129,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
     };
 
     if (isEditMode && targetId) {
-      // RELATIVE PATH DENGAN PARAMETER NOMOR BARIS UNTUK UPDATE DATA LAMA
+      // Endpoint update data baris lama
       axios.put(`/api/trial/${targetId}`, formData)
         .then(() => {
           alert(`🎉 PROFIL BERHASIL DI-EDIT PADA BARIS #${targetId}!`);
@@ -132,7 +141,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
           alert("Gagal memperbarui data lama di Google Sheets!");
         });
     } else {
-      // RELATIVE PATH UNTUK DATA BARU
+      // Endpoint kirim data baris baru
       axios.post("/api/trial", formData)
         .then(() => {
           alert(`🟢 Data Baru Profil ${profil.toUpperCase()} Berhasil Disimpan!`);
