@@ -2,129 +2,113 @@ const express = require("express");
 const cors = require("cors");
 const { GoogleSpreadsheet } = require("google-spreadsheet");
 
-// Membaca credentials secara aman (Lokal / Vercel)
-const credentials = process.env.GOOGLE_CREDENTIALS 
-  ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
-  : require('./credentials.json');
-
-  if (credentials.private_key) {
-  credentials.private_key = credentials.private_key
-    .replace(/\\n/g, '\n')       // Mengubah teks '\n' literal menjadi enter asli
-    .replace(/"/g, '')           // Menghapus tanda kutip ganda yang nyangkut di dalam string
-    .trim();                     // Menghapus spasi gaib di awal/akhir kunci
-}
-
-const SPREADSHEET_ID = "1pMBk3-tgfDe8L6l9cUxAQgXW3c-HPyVqPkqPYf1iQfE";
-
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. FUNGSI UNTUK MENYIMPAN DATA BARU (POST)
-app.post('/api/trial', async (req, res) => {
-    try {
-        const { tanggal, project, profil, trial, hasil, defect } = req.body;
-        
-        // Versi 3: Inisialisasi hanya membutuhkan ID Spreadsheet saja
-        const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
-        
-        // Autentikasi gaya Versi 3
-        // GANTI bagian doc.useServiceAccountAuth di dalam app.get, app.post, dan app.put dengan ini:
+// 1. Membaca credentials secara aman
+const credentials = process.env.GOOGLE_CREDENTIALS 
+  ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
+  : require('./credentials.json');
 
-await doc.useServiceAccountAuth({
-    client_email: credentials.client_email,
-    // Tambahkan .replace(/\\n/g, '\n') untuk memperbaiki format enter di Vercel
-    private_key: credentials.private_key.replace(/\\n/g, '\n'),
-});
-        await doc.loadInfo();
-        const sheet = doc.sheetsByIndex[0];
+// 🌟 BERSIHKAN FORMAT ENTER KUNCI RAHASIA (Mencegah Invalid JWT Signature)
+if (credentials.private_key) {
+  credentials.private_key = credentials.private_key
+    .replace(/\\n/g, '\n')       
+    .replace(/"/g, '')           
+    .trim();                     
+}
 
-        // Simpan data ke baris baru
-        await sheet.addRow([tanggal, project, profil, trial, hasil, defect]);
+const SPREADSHEET_ID = "1pMBk3-tgfDe8L6l9cUxAQgXW3c-HPyVqPkqPYf1iQfE";
 
-        console.log("🎉 Data baru berhasil ditulis ke Google Sheets:", req.body);
-        res.status(201).json({ message: "Data berhasil disimpan!" });
-    } catch (err) {
-        console.error("🛑 Gagal menulis ke Google Sheets:", err.message);
-        res.status(500).json({ error: "Gagal menyimpan data", details: err.message });
-    }
-});
-
-// 2. FUNGSI UNTUK MEMBACA DATA (GET)
+// --- URL GET: AMBIL DATA ---
 app.get("/api/trial", async (req, res) => {
-    try {
-        const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
-        
-        // Autentikasi gaya Versi 3
-        await doc.useServiceAccountAuth({
-            client_email: credentials.client_email,
-            private_key: credentials.private_key,
-        });
+  try {
+    const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
+    await doc.useServiceAccountAuth({
+      client_email: credentials.client_email,
+      private_key: credentials.private_key,
+    });
 
-        await doc.loadInfo();
-        const sheet = doc.sheetsByIndex[0];
-        const rows = await sheet.getRows();
+    await doc.loadInfo();
+    const sheet = doc.sheetsByIndex[0];
+    const rows = await sheet.getRows();
 
-        const data = rows.map(row => {
-            const raw = row._rawData || [];
-            return {
-                id: row.rowNumber, // Nomor Baris di Google Sheets sebagai ID unik
-                tanggal: raw[0] ? raw[0].trim() : "",
-                project: raw[1] ? raw[1].trim() : "", 
-                profil:  raw[2] ? raw[2].trim() : "",
-                trial:   raw[3] ? raw[3].trim() : "",
-                hasil:   raw[4] ? raw[4].trim() : "",
-                defect:  raw[5] ? raw[5].trim() : ""
-            };
-        });
+    const data = rows.map((row) => ({
+      id: row.rowNumber, 
+      tanggal: row._rawData[0] || "",
+      project: row._rawData[1] || "",
+      profil: row._rawData[2] || "",
+      trial: row._rawData[3] || "0",
+      hasil: row._rawData[4] || "",
+      defect: row._rawData[5] || "",
+    }));
 
-        res.json(data);
-    } catch (err) {
-        console.error("🛑 Gagal mengambil data:", err.message);
-        res.status(500).json({ error: "Gagal mengambil data", details: err.message });
-    }
+    res.json(data);
+  } catch (err) {
+    console.error("Gagal mengambil data:", err.message);
+    res.status(500).json({ error: "Gagal mengambil data dari Google Sheets" });
+  }
 });
 
-// 3. FUNGSI UNTUK MENGEDIT/UPDATE DATA BERDASARKAN NOMOR BARIS (PUT)
+// --- URL POST: TAMBAH DATA BARU ---
+app.post("/api/trial", async (req, res) => {
+  try {
+    const { tanggal, project, profil, trial, hasil, defect } = req.body;
+    const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
+    await doc.useServiceAccountAuth({
+      client_email: credentials.client_email,
+      private_key: credentials.private_key,
+    });
+
+    await doc.loadInfo();
+    const sheet = doc.sheetsByIndex[0];
+
+    await sheet.addRow([tanggal, project, profil, trial, hasil, defect]);
+    res.json({ message: "Data baru berhasil disimpan!" });
+  } catch (err) {
+    console.error("Gagal menyimpan data:", err.message);
+    res.status(500).json({ error: "Gagal menyimpan data baru" });
+  }
+});
+
+// --- URL PUT: EDIT DATA LAMA ---
 app.put('/api/trial/:rowNumber', async (req, res) => {
-    try {
-        const { rowNumber } = req.params;
-        const { tanggal, project, profil, trial, hasil, defect } = req.body;
+  try {
+    const { rowNumber } = req.params;
+    const { tanggal, project, profil, trial, hasil, defect } = req.body;
 
-        const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
-        
-        // Autentikasi gaya Versi 3
-        await doc.useServiceAccountAuth({
-            client_email: credentials.client_email,
-            private_key: credentials.private_key,
-        });
+    const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
+    await doc.useServiceAccountAuth({
+      client_email: credentials.client_email,
+      private_key: credentials.private_key,
+    });
 
-        await doc.loadInfo();
-        const sheet = doc.sheetsByIndex[0];
-        const rows = await sheet.getRows();
+    await doc.loadInfo();
+    const sheet = doc.sheetsByIndex[0];
+    const rows = await sheet.getRows();
 
-        // Cari baris Google Sheets yang cocok dengan nomor baris target
-        const targetRow = rows.find(r => String(r.rowNumber) === String(rowNumber));
+    // Cari baris berdasarkan rowNumber Google Sheet
+    const targetRow = rows.find(row => String(row.rowNumber) === String(rowNumber));
 
-        if (!targetRow) {
-            return res.status(404).json({ error: "Data tidak ditemukan!" });
-        }
-
-        targetRow._rawData[0] = tanggal;
-        targetRow._rawData[1] = project;
-        targetRow._rawData[2] = profil;
-        targetRow._rawData[3] = String(trial);
-        targetRow._rawData[4] = hasil;
-        targetRow._rawData[5] = defect;
-
-        await targetRow.save();
-
-        console.log(`🎉 Baris #${rowNumber} berhasil diperbarui.`);
-        res.json({ message: "Data berhasil diperbarui!" });
-    } catch (err) {
-        console.error("🛑 Gagal mengupdate Google Sheets:", err.message);
-        res.status(500).json({ error: "Gagal memperbarui data", details: err.message });
+    if (!targetRow) {
+      return res.status(404).json({ error: "Data baris tidak ditemukan!" });
     }
+
+    // Update data pada array baris
+    targetRow._rawData[0] = tanggal;
+    targetRow._rawData[1] = project;
+    targetRow._rawData[2] = profil;
+    targetRow._rawData[3] = String(trial);
+    targetRow._rawData[4] = hasil;
+    targetRow._rawData[5] = defect;
+
+    await targetRow.save();
+    res.json({ message: "Data lama berhasil ditimpa!" });
+  } catch (err) {
+    console.error("Gagal mengupdate Google Sheets:", err.message);
+    res.status(500).json({ error: "Gagal memperbarui data", details: err.message });
+  }
 });
 
 module.exports = app;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios"; 
+import axios from "react-react"; 
 import SummaryCard from "./components/SummaryCard";
 import ChartOKNG from "./components/ChartOKNG";
 import PieDefect from "./components/PieDefect";
@@ -31,19 +31,12 @@ function App() {
   const [tableEndDate, setTableEndDate] = useState("");
   const [filterTrialTerbanyak, setFilterTrialTerbanyak] = useState(false);
 
-  // 1. FUNGSI AMBIL DATA
-//  const fetchDataDariBackend = useCallback(() => {
- //   axios.get("http://localhost:3000/api/trial") 
-  //    .then((res) => {
-   //     setRawData(res.data);
-   //     setFilteredData(res.data);
-   // 1. FUNGSI AMBIL DATA YANG SUDAH DISINKRONKAN
+  // 1. FUNGSI AMBIL DATA (Aman dari Infinite Loop)
   const fetchDataDariBackend = useCallback(() => {
     axios.get("/api/trial") 
       .then((res) => {  
-        // Isi kedua state utama agar data langsung tampil di dashboard & tabel tanpa dipancing filter
         setRawData(res.data);
-        setFilteredData(res.data); 
+        setFilteredData(res.data); // SINKRONISASI DATA AWAL LANGSUNG MUNCUL
 
         const projects = new Set();
         res.data.forEach(item => {
@@ -52,10 +45,9 @@ function App() {
         });
         setProjectList(["ALL", ...Array.from(projects)]);
       })
-      .catch(err => {
-        console.error("🛑 Gagal mengambil data API dari Vercel/Sheets:", err);
-      });
+      .catch(err => console.error("Gagal mengambil data API:", err));
   }, []);
+
   useEffect(() => {
     const loginStatus = localStorage.getItem("dashboard_access");
     if (loginStatus === "granted") setIsAuthenticated(true);
@@ -68,11 +60,10 @@ function App() {
     }
   }, [isAuthenticated, fetchDataDariBackend]);
 
-  // 2. LOGIKA FILTER GLOBAL (Hanya untuk Project & Normalisasi Format Teks Tanggal)
+  // 2. LOGIKA FILTER GLOBAL
   useEffect(() => {
     let baseData = rawData;
 
-    // Filter berdasarkan Project Utama (Kiri Atas)
     if (selectedProject !== "ALL") {
       baseData = rawData.filter(item => {
         const pName = item.project && item.project.trim() !== "" ? item.project.trim() : "Project Lama";
@@ -80,7 +71,6 @@ function App() {
       });
     }
 
-    // Normalisasi teks penulisan bulan dari database
     const cleanedBaseData = baseData.map(item => {
       if (item && item.tanggal) {
         let formattedDate = String(item.tanggal).toLowerCase()
@@ -95,7 +85,6 @@ function App() {
 
     setFilteredData(cleanedBaseData);
 
-    // Olah data unik untuk keperluan chart profil
     const uniqueDataMap = new Map();
     cleanedBaseData.forEach(item => {
       if (item && item.profil) {
@@ -105,7 +94,6 @@ function App() {
     });
     setChartData(Array.from(uniqueDataMap.values()));
 
-    // Reset filter individual tabel ketika ganti project utama agar tidak tabrakan
     setSearchQuery("");
     setTableFilterHasil("ALL");
     setTableFilterDefect("ALL");
@@ -114,15 +102,13 @@ function App() {
     setFilterTrialTerbanyak(false);
   }, [selectedProject, rawData]);
 
-  // 3. LOGIKA FILTER BERLAPIS PADA TABEL LOG (Termasuk Perbaikan Filter Tanggal Akurat)
+  // 3. LOGIKA FILTER BERLAPIS TABEL
   const dataHasilSearch = filteredData.filter(item => {
     const searchLower = searchQuery.toLowerCase();
-    
     const statusHasil = item.hasil ? String(item.hasil).trim().toUpperCase() : "";
     const defectHasil = item.defect ? String(item.defect).trim().toUpperCase() : "";
     const itemDateStr = item.tanggal ? String(item.tanggal).trim() : "";
 
-    // A. Filter Pencarian global teks
     const cocokSearch = (
       !searchQuery ||
       (item.profil && String(item.profil).toLowerCase().includes(searchLower)) ||
@@ -131,31 +117,23 @@ function App() {
       (item.tanggal && String(item.tanggal).toLowerCase().includes(searchLower))
     );
 
-    // B. Filter Dropdown Status OK/NG
     let cocokHasil = true;
     if (tableFilterHasil === "OK") cocokHasil = (statusHasil === "OK" || statusHasil === "APPROVE");
     if (tableFilterHasil === "NG") cocokHasil = (statusHasil === "NG");
 
-    // C. Filter Dropdown Jenis Defect
     let cocokDefect = true;
     if (tableFilterDefect !== "ALL") cocokDefect = (defectHasil === tableFilterDefect);
 
-    // D. Filter Rentang Tanggal yang Akurat (Mengatasi Format Masalah Kombinasi)
     let cocokTanggal = true;
     if (itemDateStr) {
       let dateData;
-
-      // Cek jika format database adalah DD-MM-YYYY (Contoh: 14-06-2026)
       const bagianTanggal = itemDateStr.split("-");
       if (bagianTanggal.length === 3 && bagianTanggal[0].length === 2) {
-        // Balik urutannya menjadi format standar YYYY-MM-DD agar bisa dibaca JavaScript
         dateData = new Date(`${bagianTanggal[2]}-${bagianTanggal[1]}-${bagianTanggal[0]}`);
       } else {
-        // Jika format database sudah standar YYYY-MM-DD (Contoh: 2026-06-14)
         dateData = new Date(itemDateStr);
       }
 
-      // Jalankan validasi objek tanggal
       if (!isNaN(dateData.getTime())) {
         dateData.setHours(0, 0, 0, 0);
 
@@ -170,14 +148,12 @@ function App() {
           cocokTanggal = cocokTanggal && (dateData <= dateSelesai);
         }
       } else {
-        // Pengaman: Jika parsing gagal, tampilkan data hanya jika filter tanggal kosong
         cocokTanggal = !tableStartDate && !tableEndDate;
       }
     } else if (tableStartDate || tableEndDate) {
       cocokTanggal = false; 
     }
 
-    // E. Filter Checkbox Trial Tertinggi
     let cocokTrialTerbanyak = true;
     if (filterTrialTerbanyak && item.profil) {
       const semuaTrialProfilIni = filteredData
@@ -214,19 +190,11 @@ function App() {
 
   return (
     <div className="app-container">
-      
-      {/* PANEL NAVIGASI ATAS */}
       <div className="nav-panel no-print">
         <div className="tab-wrapper">
-          <button onClick={() => setActiveMenu("dashboard")} className={activeMenu === "dashboard" ? "tab-btn-active" : "tab-btn-inactive"}>
-            Ringkasan Grafik
-          </button>
-          <button onClick={() => setActiveMenu("table")} className={activeMenu === "table" ? "tab-btn-active" : "tab-btn-inactive"}>
-            Log Tabel ({filteredData.length})
-          </button>
-          <button onClick={() => setActiveMenu("input_form")} className={activeMenu === "input_form" ? "tab-btn-active" : "tab-btn-inactive"}>
-            Input Data Trial
-          </button>
+          <button onClick={() => setActiveMenu("dashboard")} className={activeMenu === "dashboard" ? "tab-btn-active" : "tab-btn-inactive"}>Ringkasan Grafik</button>
+          <button onClick={() => setActiveMenu("table")} className={activeMenu === "table" ? "tab-btn-active" : "tab-btn-inactive"}>Log Tabel ({filteredData.length})</button>
+          <button onClick={() => setActiveMenu("input_form")} className={activeMenu === "input_form" ? "tab-btn-active" : "tab-btn-inactive"}>Input Data Trial</button>
         </div>
 
         <div className="proj-select-wrapper">
@@ -239,14 +207,13 @@ function App() {
         </div>
 
         <div>
-          <button onClick={() => window.print()} className="btn-print" style={{ marginRight: "8px" }}> Eksport PDF</button>
-          <button onClick={handleLogout} className="btn-logout"> Kunci</button>
+          <button onClick={() => window.print()} className="btn-print" style={{ marginRight: "8px" }}>Eksport PDF</button>
+          <button onClick={handleLogout} className="btn-logout">Kunci</button>
         </div>
       </div>
 
       <h1 className="main-title">MONITORING PERFORMA TRIAL PROFIL</h1>
 
-      {/* VALIDASI KARTU RINGKASAN */}
       {rawData.length > 0 ? (
         <SummaryCard data={chartData} rawData={filteredData}/>
       ) : (
@@ -254,28 +221,18 @@ function App() {
       )}
       <br /><br />
 
-      {/* VIEW GRAPH */}
       {activeMenu === "dashboard" && (
         <>
           <div className="dashboard-grid">
-            <div className="card-chart-sm card-pdf">
-              <ChartOKNG data={filteredData} />
-            </div>
-            <div className="card-chart-md card-pdf">
-              <PieDefect data={filteredData} />
-            </div>
-            <div className="card-chart-lg card-pdf">
-              <ChartProfil data={filteredData} />
-            </div>
+            <div className="card-chart-sm card-pdf"><ChartOKNG data={filteredData} /></div>
+            <div className="card-chart-md card-pdf"><PieDefect data={filteredData} /></div>
+            <div className="card-chart-lg card-pdf"><ChartProfil data={filteredData} /></div>
           </div>
           <br /><br />
-          <div className="card-chart-line card-pdf">
-            <ChartPerHari data={filteredData} />
-          </div>
+          <div className="card-chart-line card-pdf"><ChartPerHari data={filteredData} /></div>
         </>
       )}
 
-      {/* VIEW TABLE */}
       {activeMenu === "table" && (
         <div className="table-view-card">
           <div className="filter-bar no-print">
@@ -300,41 +257,29 @@ function App() {
 
             <div className="filter-field">
               <label>TANGGAL AWAL:</label>
-              <input type="date" value={tableStartDate} onChange={(e) => setTableStartDate(e.target.value)} className="custom-select" style={{ fontWeight: "normal" }} />
+              <input type="date" value={tableStartDate} onChange={(e) => setTableStartDate(e.target.value)} className="custom-select" />
             </div>
 
             <div className="filter-field">
               <label>TANGGAL AKHIR:</label>
-              <input type="date" value={tableEndDate} onChange={(e) => setTableEndDate(e.target.value)} className="custom-select" style={{ fontWeight: "normal" }} />
+              <input type="date" value={tableEndDate} onChange={(e) => setTableEndDate(e.target.value)} className="custom-select" />
             </div>
 
             <div className="filter-checkbox-wrapper">
               <input type="checkbox" id="chkMaxTrial" checked={filterTrialTerbanyak} onChange={(e) => setFilterTrialTerbanyak(e.target.checked)} />
-              <label htmlFor="chkMaxTrial" className="filter-checkbox-label" style={{ color: filterTrialTerbanyak ? "#b85c65" : "#4a5568" }}>
-               TRIAL TERTINGGI
-              </label>
+              <label htmlFor="chkMaxTrial" className="filter-checkbox-label" style={{ color: filterTrialTerbanyak ? "#b85c65" : "#4a5568" }}>TRIAL TERTINGGI</label>
             </div>
 
             <div className="search-field">
               <label>PENCARIAN :</label>
-              <input type="text" placeholder="Cari nomor profil atau temuan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <input type="text" placeholder="Cari nomor profil..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
           </div>
 
           <div className="filter-info-row">
-            <span className="filter-info-text">
-              Menampilkan <b className="filter-info-count">{dataHasilSearch.length}</b> baris dari filter aktif.
-            </span>
+            <span>Menampilkan <b>{dataHasilSearch.length}</b> baris dari filter aktif.</span>
             {(searchQuery || tableFilterHasil !== "ALL" || tableFilterDefect !== "ALL" || tableStartDate || tableEndDate || filterTrialTerbanyak) && (
-              <button 
-                onClick={() => { 
-                  setSearchQuery(""); setTableFilterHasil("ALL"); setTableFilterDefect("ALL"); 
-                  setTableStartDate(""); setTableEndDate(""); setFilterTrialTerbanyak(false); 
-                }} 
-                className="btn-reset-filter"
-              >
-                Clear Semua Filter ×
-              </button>
+              <button onClick={() => { setSearchQuery(""); setTableFilterHasil("ALL"); setTableFilterDefect("ALL"); setTableStartDate(""); setTableEndDate(""); setFilterTrialTerbanyak(false); }} className="btn-reset-filter">Clear Semua Filter ×</button>
             )}
           </div>
 
@@ -342,13 +287,7 @@ function App() {
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: "50px" }}>No</th>
-                  <th style={{ width: "120px" }}>Tanggal</th>
-                  <th style={{ width: "160px" }}>Project</th>
-                  <th style={{ width: "150px" }}>No Profil</th>
-                  <th style={{ width: "100px", textAlign: "center" }}>Trial Ke</th>
-                  <th style={{ width: "120px" }}>Hasil</th>
-                  <th>Keterangan Temuan Lapangan</th>
+                  <th>No</th><th>Tanggal</th><th>Project</th><th>No Profil</th><th>Trial Ke</th><th>Hasil</th><th>Keterangan Temuan</th>
                 </tr>
               </thead>
               <tbody>
@@ -361,25 +300,15 @@ function App() {
                         <td>{idx + 1}</td>
                         <td>{item.tanggal || "-"}</td>
                         <td>{item.project || "Project Lama"}</td>
-                        <td style={{ fontWeight: "600", color: "#2b303a" }}>{item.profil || "-"}</td>
-                        <td style={{ textAlign: "center", fontWeight: "600" }}>{item.trial || "0"}</td>
-                        <td>
-                          <span className={`badge ${isOk ? "badge-ok" : "badge-ng"}`}>
-                            {status}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: "500", color: isOk ? "#6c757d" : "#9e3d48" }}>
-                          {isOk ? "✅ PASS PRODUCT" : `❌ DEFECT: ${item.defect ? item.defect.toUpperCase() : "UNKNOWN"}`}
-                        </td>
+                        <td style={{ fontWeight: "600" }}>{item.profil || "-"}</td>
+                        <td style={{ textAlign: "center" }}>{item.trial || "0"}</td>
+                        <td><span className={`badge ${isOk ? "badge-ok" : "badge-ng"}`}>{status}</span></td>
+                        <td style={{ color: isOk ? "#6c757d" : "#9e3d48" }}>{isOk ? "✅ PASS PRODUCT" : `❌ DEFECT: ${item.defect ? item.defect.toUpperCase() : "UNKNOWN"}`}</td>
                       </tr>
                     );
                   })
                 ) : (
-                  <tr>
-                    <td colSpan="7" className="empty-row-text">
-                      📭 Tidak ada data log yang cocok dengan filter.
-                    </td>
-                  </tr>
+                  <tr><td colSpan="7" className="empty-row-text">📭 Tidak ada data log yang cocok.</td></tr>
                 )}
               </tbody>
             </table>
@@ -387,14 +316,9 @@ function App() {
         </div>
       )}
 
-      {/* VIEW INPUT FORM */}
       {activeMenu === "input_form" && (
-        <FormInput 
-          onDataSaved={fetchDataDariBackend} 
-          existingData={rawData} 
-        />
+        <FormInput onDataSaved={fetchDataDariBackend} existingData={rawData} />
       )}
-
     </div>
   );
 }
