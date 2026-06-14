@@ -51,185 +51,94 @@ function FormInput({ onDataSaved, existingData = [] }) {
     return tglLokal.toISOString().split('T')[0];
 
   };
-
-
-
   const [tanggalInput, setTanggalInput] = useState(getHariIni());
 
-
-
   useEffect(() => {
-
     // Pengaman: Jika input profil kosong atau database dari sheet belum termuat
-
     if (!profil.trim() || existingData.length === 0) {
-
       setIsEditMode(false);
-
       setIsLockedBySystem(false);
-
       setTargetId(null);
-
       return;
-
     }
-
-
 
     const profilClean = profil.trim().toUpperCase();
 
-
-
     // 1. CEK MODE EDIT (Exact Match - Mengakomodasi Data OK & NG)
-
     const dataLama = existingData.find(item => {
-
       const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
-
       const trialDB = item.trial ? String(item.trial).trim() : "";
-
       const trialInput = String(trial).trim();
 
-
-
       return profilDB === profilClean && trialDB === trialInput;
-
     });
 
-
-
     if (dataLama) {
-
-      setTargetId(dataLama.id);
-
-      setIsLockedBySystem(false);
-
-
-
+      setTargetId(dataLama.id); 
+      setIsLockedBySystem(false); 
+      
       // 🟢 PERBAIKAN: Kunci status mode edit terlebih dahulu sebelum mengubah state kondisional hasil/defect
-
       if (!isEditMode) {
-
         setIsEditMode(true);
-
         setProject(dataLama.project || "");
-
-
-
+        
         // Ambil status asli dari Google Sheets
-
         const statusSpreedsheet = dataLama.hasil?.toUpperCase() === "OK" || dataLama.hasil?.toUpperCase() === "APPROVE" ? "OK" : "NG";
-
         setHasil(statusSpreedsheet);
-
         setIsNg(statusSpreedsheet !== "OK");
-
         setDefect(dataLama.defect || "");
-
         if (dataLama.tanggal) setTanggalInput(dataLama.tanggal);
-
       }
-
-      return;
-
+      return; 
     }
-
-
 
     // 2. LOGIKA POKA-YOKE AUTO-INCREMENT (Hanya mengunci jika data terakhir NG)
-
     if (!isManualBypass) {
-
       const riwayatProfil = existingData.filter(item => {
-
         const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
-
         return profilDB === profilClean;
-
       });
 
-
-
       if (riwayatProfil.length > 0 && !isEditMode) {
-
         const semuaNomorTrial = riwayatProfil.map(x => Number(x.trial) || 0);
-
         const trialTertinggi = Math.max(...semuaNomorTrial);
-
-
-
+        
         const dataTrialTerakhir = riwayatProfil.find(x => Number(x.trial) === trialTertinggi);
-
         const statusTerakhir = dataTrialTerakhir?.hasil?.trim().toUpperCase();
 
-
-
         // Poka-yoke aktif HANYA jika trial terakhir REJECT/NG
-
         if ((statusTerakhir === "NG") && !trial) {
-
-          setTrial(trialTertinggi + 1);
-
-          setIsLockedBySystem(true);
-
+          setTrial(trialTertinggi + 1); 
+          setIsLockedBySystem(true);    
           setProject(dataTrialTerakhir.project || "");
-
           return;
-
         }
-
       }
-
     }
-
-
 
     // Jika data tidak ditemukan di database dan sistem tidak sedang melakukan auto-increment
-
     if (!dataLama && !isLockedBySystem) {
-
       setIsEditMode(false);
-
     }
-
   }, [profil, trial, existingData, isManualBypass, isEditMode]);
 
-
-
   const handleBukaGembok = () => {
-
     setIsManualBypass(true);
-
     setIsLockedBySystem(false);
-
     setTrial("");
-
   };
 
-
-
   const resetFormTotal = () => {
-
     setProject("");
-
     setProfil("");
-
     setTrial("");
-
     setHasil("NG");
-
     setDefect("");
-
     setIsNg(true);
-
     setIsEditMode(false);
-
     setIsLockedBySystem(false);
-
     setIsManualBypass(false);
-
     setTargetId(null);
-
     setTanggalInput(getHariIni());
 
   };
