@@ -54,8 +54,8 @@ function FormInput({ onDataSaved, existingData = [] }) {
   const [tanggalInput, setTanggalInput] = useState(getHariIni());
 
   useEffect(() => {
-    // Pengaman: Jika input profil kosong atau database dari sheet belum termuat
-    if (!profil.trim() || existingData.length === 0) {
+    // 1. Reset jika input kosong
+    if (!profil.trim() || !String(trial).trim()) {
       setIsEditMode(false);
       setIsLockedBySystem(false);
       setTargetId(null);
@@ -63,64 +63,46 @@ function FormInput({ onDataSaved, existingData = [] }) {
     }
 
     const profilClean = profil.trim().toUpperCase();
+    const trialClean = String(trial).trim();
 
-    // 1. CEK MODE EDIT (Exact Match - Mengakomodasi Data OK & NG)
+    // 2. Cari data lama
     const dataLama = existingData.find(item => {
-      const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
-      const trialDB = item.trial ? String(item.trial).trim() : "";
-      const trialInput = String(trial).trim();
-
-      return profilDB === profilClean && trialDB === trialInput;
+      const pDB = String(item.profil || "").trim().toUpperCase();
+      const tDB = String(item.trial || "").trim();
+      return pDB === profilClean && tDB === trialClean;
     });
 
+    // 3. Logika Edit (Hanya set state jika data ketemu)
     if (dataLama) {
-      setTargetId(dataLama.id); 
-      setIsLockedBySystem(false); 
+      setIsEditMode(true);
+      setTargetId(dataLama.id);
+      setProject(dataLama.project || "");
       
-      // 🟢 PERBAIKAN: Kunci status mode edit terlebih dahulu sebelum mengubah state kondisional hasil/defect
-      if (!isEditMode) {
-        setIsEditMode(true);
-        setProject(dataLama.project || "");
-        
-        // Ambil status asli dari Google Sheets
-        const statusSpreedsheet = dataLama.hasil?.toUpperCase() === "OK" || dataLama.hasil?.toUpperCase() === "APPROVE" ? "OK" : "NG";
-        setHasil(statusSpreedsheet);
-        setIsNg(statusSpreedsheet !== "OK");
-        setDefect(dataLama.defect || "");
-        if (dataLama.tanggal) setTanggalInput(dataLama.tanggal);
-      }
-      return; 
-    }
-
-    // 2. LOGIKA POKA-YOKE AUTO-INCREMENT (Hanya mengunci jika data terakhir NG)
-    if (!isManualBypass) {
-      const riwayatProfil = existingData.filter(item => {
-        const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
-        return profilDB === profilClean;
-      });
-
-      if (riwayatProfil.length > 0 && !isEditMode) {
-        const semuaNomorTrial = riwayatProfil.map(x => Number(x.trial) || 0);
-        const trialTertinggi = Math.max(...semuaNomorTrial);
-        
-        const dataTrialTerakhir = riwayatProfil.find(x => Number(x.trial) === trialTertinggi);
-        const statusTerakhir = dataTrialTerakhir?.hasil?.trim().toUpperCase();
-
-        // Poka-yoke aktif HANYA jika trial terakhir REJECT/NG
-        if ((statusTerakhir === "NG") && !trial) {
-          setTrial(trialTertinggi + 1); 
-          setIsLockedBySystem(true);    
-          setProject(dataTrialTerakhir.project || "");
-          return;
+      const statusRaw = String(dataLama.hasil || "").trim().toUpperCase();
+      const isStatusOk = statusRaw === "OK" || statusRaw === "APPROVE";
+      
+      setHasil(isStatusOk ? "OK" : "NG");
+      setIsNg(!isStatusOk); // Ini akan memicu UI update, tapi tidak akan memicu loop karena kita pisah logic-nya
+      setDefect(dataLama.defect || "");
+      if (dataLama.tanggal) setTanggalInput(dataLama.tanggal);
+      setIsLockedBySystem(false);
+    } else {
+      // 4. Logika Poka-Yoke (Hanya jika tidak sedang di mode edit)
+      setIsEditMode(false);
+      setTargetId(null);
+      
+      const riwayat = existingData.filter(item => String(item.profil).trim().toUpperCase() === profilClean);
+      if (riwayat.length > 0 && !isManualBypass) {
+        const lastTrial = Math.max(...riwayat.map(x => Number(x.trial) || 0));
+        const dataLast = riwayat.find(x => Number(x.trial) === lastTrial);
+        if (dataLast?.hasil?.trim().toUpperCase() === "NG") {
+          setTrial(lastTrial + 1);
+          setIsLockedBySystem(true);
+          setProject(dataLast.project || "");
         }
       }
     }
-
-    // Jika data tidak ditemukan di database dan sistem tidak sedang melakukan auto-increment
-    if (!dataLama && !isLockedBySystem) {
-      setIsEditMode(false);
-    }
-  }, [profil, trial, existingData, isManualBypass, isEditMode]);
+  }, [profil, trial, existingData]); // Hapus isEditMode dan isNg dari dependency agar tidak loop
 
   const handleBukaGembok = () => {
     setIsManualBypass(true);
@@ -140,85 +122,44 @@ function FormInput({ onDataSaved, existingData = [] }) {
     setIsManualBypass(false);
     setTargetId(null);
     setTanggalInput(getHariIni());
-
   };
 
-
-
   const handleSubmit = (e) => {
-
     e.preventDefault();
-
-
-
     const formData = {
-
       tanggal: tanggalInput,
-
       project: project,
-
       profil: profil.trim().toUpperCase(),
-
       trial: String(trial),
-
       hasil: hasil,
-
       defect: hasil === "OK" ? "APPROVE" : defect
-
     };
 
-
-
     if (isEditMode && targetId) {
-
       // Endpoint update data baris lama
-
       axios.put(`/api/trial/${targetId}`, formData)
-
         .then(() => {
-
           alert(`🎉 PROFIL BERHASIL DI-EDIT PADA BARIS #${targetId}!`);
-
           resetFormTotal();
-
           if (onDataSaved) onDataSaved();
-
         })
-
         .catch(err => {
-
           console.error("Gagal update data:", err);
-
           alert("Gagal memperbarui data lama di Google Sheets!");
-
         });
-
     } else {
-
       // Endpoint kirim data baris baru
-
       axios.post("/api/trial", formData)
-
         .then(() => {
-
           alert(`🟢 Data Baru Profil ${profil.toUpperCase()} Berhasil Disimpan!`);
-
           resetFormTotal();
-
           if (onDataSaved) onDataSaved();
-
         })
-
         .catch(err => {
-
           console.error("Gagal menyimpan data:", err);
-
           alert("Gagal menyimpan data baru ke Google Sheets!");
-
         });
-
     }
-
   };
 
 
@@ -263,33 +204,8 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={labelStyle}>NAMA PROJECT:</label><input type="text" value={project} onChange={(e) => setProject(e.target.value)} required style={inputStyle} /></div>
 
-        {/* 🟢 GANTI BAGIAN INI DENGAN KODE DI BAWAH */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-          <label style={{ ...labelStyle, color: isNg ? "#b85c65" : "#6c757d" }}>JENIS DEFECT:</label>
-          <select 
-            value={isNg ? defect : "APPROVE"} 
-            onChange={(e) => setDefect(e.target.value)} 
-            disabled={!isNg}
-            style={{ 
-              ...selectStyle, 
-              backgroundColor: isNg ? "white" : "#f8f9fa", 
-              color: isNg ? "#2b303a" : "#6c757d",
-              cursor: isNg ? "pointer" : "not-allowed"
-            }}
-          >
-            {!isNg ? (
-              <option value="APPROVE">APPROVE (DATA OK)</option>
-            ) : (
-              <>
-                <option value="">-- Pilih Jenis Defect --</option>
-                {DEFECT_OPTIONS.map((opt, index) => (
-                  <option key={index} value={opt}>{opt}</option>
-                ))}
-              </>
-            )}
-          </select>
-        </div>
-     
+        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={labelStyle}>STATUS HASIL:</label><select value={hasil} required style={selectStyle} onChange={(e) => { setHasil(e.target.value); setIsNg(e.target.value === "NG"); }}><option value="NG">NG (REJECT)</option><option value="OK">OK (APPROVE)</option></select></div>
+
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}><label style={{ ...labelStyle, color: isNg ? "#b85c65" : "#495057" }}>JENIS DEFECT:</label>{isNg ? (<select value={defect} onChange={(e) => setDefect(e.target.value)} required style={selectStyle}><option value="">-- Pilih Jenis Defect --</option>{DEFECT_OPTIONS.map((opt, index) => (<option key={index} value={opt}>{opt}</option>))}</select>) : (<input type="text" value="APPROVE" disabled style={{ ...inputStyle, backgroundColor: "#f8f9fa", color: "#6c757d" }} />)}</div>
 
         <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
