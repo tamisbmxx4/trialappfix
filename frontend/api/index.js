@@ -7,6 +7,13 @@ const credentials = process.env.GOOGLE_CREDENTIALS
   ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
   : require('./credentials.json');
 
+  if (credentials.private_key) {
+  credentials.private_key = credentials.private_key
+    .replace(/\\n/g, '\n')       // Mengubah teks '\n' literal menjadi enter asli
+    .replace(/"/g, '')           // Menghapus tanda kutip ganda yang nyangkut di dalam string
+    .trim();                     // Menghapus spasi gaib di awal/akhir kunci
+}
+
 const SPREADSHEET_ID = "1pMBk3-tgfDe8L6l9cUxAQgXW3c-HPyVqPkqPYf1iQfE";
 
 const app = express();

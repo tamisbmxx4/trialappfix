@@ -37,10 +37,13 @@ function App() {
   //    .then((res) => {
    //     setRawData(res.data);
    //     setFilteredData(res.data);
-   const fetchDataDariBackend = useCallback(() => {
+   // 1. FUNGSI AMBIL DATA YANG SUDAH DISINKRONKAN
+  const fetchDataDariBackend = useCallback(() => {
     axios.get("/api/trial") 
       .then((res) => {  
+        // Isi kedua state utama agar data langsung tampil di dashboard & tabel tanpa dipancing filter
         setRawData(res.data);
+        setFilteredData(res.data); 
 
         const projects = new Set();
         res.data.forEach(item => {
@@ -49,9 +52,10 @@ function App() {
         });
         setProjectList(["ALL", ...Array.from(projects)]);
       })
-      .catch(err => console.error("Gagal mengambil data API Lokal:", err));
+      .catch(err => {
+        console.error("🛑 Gagal mengambil data API dari Vercel/Sheets:", err);
+      });
   }, []);
-
   useEffect(() => {
     const loginStatus = localStorage.getItem("dashboard_access");
     if (loginStatus === "granted") setIsAuthenticated(true);
