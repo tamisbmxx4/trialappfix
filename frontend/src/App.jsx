@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "react-react"; 
+// 🟢 KODE YANG BENAR:
+import axios from "axios";
 import SummaryCard from "./components/SummaryCard";
 import ChartOKNG from "./components/ChartOKNG";
 import PieDefect from "./components/PieDefect";
