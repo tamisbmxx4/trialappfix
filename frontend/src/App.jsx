@@ -8,7 +8,7 @@ import ChartProfil from "./components/ChartProfil";
 import FormInput from "./components/FormInput"; 
 import "./App.css"; 
 
-const GLOBAL_PASSWORD = "XXXXXXXXX"; 
+const GLOBAL_PASSWORD = "12345678"; 
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -32,11 +32,15 @@ function App() {
   const [filterTrialTerbanyak, setFilterTrialTerbanyak] = useState(false);
 
   // 1. FUNGSI AMBIL DATA
-  const fetchDataDariBackend = useCallback(() => {
-    axios.get("http://localhost:3000/api/trial") 
+//  const fetchDataDariBackend = useCallback(() => {
+ //   axios.get("http://localhost:3000/api/trial") 
+  //    .then((res) => {
+   //     setRawData(res.data);
+   //     setFilteredData(res.data);
+   const fetchDataDariBackend = useCallback(() => {
+    axios.get("/api/trial") 
       .then((res) => {
         setRawData(res.data);
-        setFilteredData(res.data);
 
         const projects = new Set();
         res.data.forEach(item => {
