@@ -26,6 +26,9 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
   const [targetId, setTargetId] = useState(null);
 
+  // ✅ TAMBAHAN: simpan data trial terakhir saat poka-yoke aktif
+  const [lastTrialData, setLastTrialData] = useState(null);
+
 
 
   const [project, setProject] = useState("");
@@ -54,11 +57,11 @@ function FormInput({ onDataSaved, existingData = [] }) {
   const [tanggalInput, setTanggalInput] = useState(getHariIni());
 
   useEffect(() => {
-    // Pengaman: Jika input profil kosong atau database dari sheet belum termuat
     if (!profil.trim() || existingData.length === 0) {
       setIsEditMode(false);
       setIsLockedBySystem(false);
       setTargetId(null);
+      setLastTrialData(null);
       return;
     }
 
@@ -74,25 +77,23 @@ function FormInput({ onDataSaved, existingData = [] }) {
     });
 
     if (dataLama) {
-      setTargetId(dataLama.id); 
-      setIsLockedBySystem(false); 
-      
-      // ✅ PERBAIKAN: Semua data (OK maupun NG) bisa diedit
+      setTargetId(dataLama.id);
+      setIsLockedBySystem(false);
+
       if (!isEditMode) {
         setIsEditMode(true);
         setProject(dataLama.project || "");
-        
-        // Ambil status asli dari Google Sheets
+
         const statusSpreedsheet = dataLama.hasil?.toUpperCase() === "OK" || dataLama.hasil?.toUpperCase() === "APPROVE" ? "OK" : "NG";
         setHasil(statusSpreedsheet);
         setIsNg(statusSpreedsheet !== "OK");
         setDefect(dataLama.defect || "");
         if (dataLama.tanggal) setTanggalInput(dataLama.tanggal);
       }
-      return; 
+      return;
     }
 
-    // 2. LOGIKA POKA-YOKE AUTO-INCREMENT (Hanya mengunci jika data terakhir NG)
+    // 2. LOGIKA POKA-YOKE (NG dan OK)
     if (!isManualBypass) {
       const riwayatProfil = existingData.filter(item => {
         const profilDB = item.profil ? String(item.profil).trim().toUpperCase() : "";
@@ -102,30 +103,55 @@ function FormInput({ onDataSaved, existingData = [] }) {
       if (riwayatProfil.length > 0 && !isEditMode) {
         const semuaNomorTrial = riwayatProfil.map(x => Number(x.trial) || 0);
         const trialTertinggi = Math.max(...semuaNomorTrial);
-        
+
         const dataTrialTerakhir = riwayatProfil.find(x => Number(x.trial) === trialTertinggi);
         const statusTerakhir = dataTrialTerakhir?.hasil?.trim().toUpperCase();
 
-        // Poka-yoke aktif HANYA jika trial terakhir REJECT/NG
-        if ((statusTerakhir === "NG") && !trial) {
-          setTrial(trialTertinggi + 1); 
-          setIsLockedBySystem(true);    
-          setProject(dataTrialTerakhir.project || "");
+        if (!trial) {
+          setLastTrialData(dataTrialTerakhir); // ✅ simpan untuk tombol Edit
+
+          if (statusTerakhir === "NG") {
+            // Auto-increment jika NG
+            setTrial(trialTertinggi + 1);
+            setIsLockedBySystem(true);
+            setProject(dataTrialTerakhir.project || "");
+          } else if (statusTerakhir === "OK" || statusTerakhir === "APPROVE") {
+            // ✅ Poka-yoke aktif untuk OK juga, tanpa auto-increment
+            setIsLockedBySystem(true);
+            setProject(dataTrialTerakhir.project || "");
+          }
           return;
         }
       }
     }
 
-    // Jika data tidak ditemukan di database dan sistem tidak sedang melakukan auto-increment
     if (!dataLama && !isLockedBySystem) {
       setIsEditMode(false);
+      setLastTrialData(null);
     }
   }, [profil, trial, existingData, isManualBypass, isEditMode]);
 
   const handleBukaGembok = () => {
     setIsManualBypass(true);
     setIsLockedBySystem(false);
+    setLastTrialData(null);
     setTrial("");
+  };
+
+  // ✅ TAMBAHAN: load data trial terakhir ke form untuk diedit
+  const handleEditDariPokaYoke = () => {
+    if (!lastTrialData) return;
+    setTargetId(lastTrialData.id);
+    setIsLockedBySystem(false);
+    setIsEditMode(true);
+    setProject(lastTrialData.project || "");
+    setTrial(String(lastTrialData.trial));
+    const statusSpreedsheet = lastTrialData.hasil?.toUpperCase() === "OK" || lastTrialData.hasil?.toUpperCase() === "APPROVE" ? "OK" : "NG";
+    setHasil(statusSpreedsheet);
+    setIsNg(statusSpreedsheet !== "OK");
+    setDefect(lastTrialData.defect || "");
+    if (lastTrialData.tanggal) setTanggalInput(lastTrialData.tanggal);
+    setLastTrialData(null);
   };
 
   const resetFormTotal = () => {
@@ -139,6 +165,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
     setIsLockedBySystem(false);
     setIsManualBypass(false);
     setTargetId(null);
+    setLastTrialData(null);
     setTanggalInput(getHariIni());
   };
 
@@ -154,7 +181,6 @@ function FormInput({ onDataSaved, existingData = [] }) {
     };
 
     if (isEditMode && targetId) {
-      // Endpoint update data baris lama
       axios.put(`/api/trial/${targetId}`, formData)
         .then(() => {
           alert(`🎉 PROFIL BERHASIL DI-EDIT PADA BARIS #${targetId}!`);
@@ -166,7 +192,6 @@ function FormInput({ onDataSaved, existingData = [] }) {
           alert("Gagal memperbarui data lama di Google Sheets!");
         });
     } else {
-      // Endpoint kirim data baris baru
       axios.post("/api/trial", formData)
         .then(() => {
           alert(`🟢 Data Baru Profil ${profil.toUpperCase()} Berhasil Disimpan!`);
@@ -188,7 +213,7 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
       <h2 style={{ margin: "0 0 20px 0", color: isEditMode ? "#2563eb" : isLockedBySystem ? "#b91c1c" : "#2b303a", fontSize: "16px", fontWeight: "700", borderBottom: "2px solid #f4f6f9", paddingBottom: "10px" }}>
 
-        {isEditMode ? `MODE EDIT: Mengoreksi Baris #${targetId} di Google Sheet` : isLockedBySystem ? "POKA-YOKE: Kelanjutan Uji Coba (Auto-Increment)" : "Input Hasil Trial Profil"}
+        {isEditMode ? `MODE EDIT: Mengoreksi Baris #${targetId} di Google Sheet` : isLockedBySystem ? "POKA-YOKE: Profil Sudah Pernah Di-Trial" : "Input Hasil Trial Profil"}
 
       </h2>
 
@@ -214,7 +239,19 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
         </div>
 
-        {isLockedBySystem && <div style={{ fontSize: "12px", color: "#b91c1c", backgroundColor: "#fef2f2", padding: "10px", borderRadius: "6px", fontWeight: "600", border: "1px solid #fca5a5" }}>⚠️ SISTEM AUTOMATIC: Profil {profil.toUpperCase()} terakhir berstatus NG. Urutan otomatis naik ke Trial Ke-{trial} agar tidak menimpa data lama.</div>}
+        {/* Poka-yoke NG */}
+        {isLockedBySystem && lastTrialData?.hasil?.toUpperCase() === "NG" && (
+          <div style={{ fontSize: "12px", color: "#b91c1c", backgroundColor: "#fef2f2", padding: "10px", borderRadius: "6px", fontWeight: "600", border: "1px solid #fca5a5" }}>
+            ⚠️ SISTEM AUTOMATIC: Profil {profil.toUpperCase()} terakhir berstatus NG (Trial ke-{lastTrialData?.trial}). Urutan otomatis naik ke Trial Ke-{trial} agar tidak menimpa data lama.
+          </div>
+        )}
+
+        {/* ✅ Poka-yoke OK */}
+        {isLockedBySystem && (lastTrialData?.hasil?.toUpperCase() === "OK" || lastTrialData?.hasil?.toUpperCase() === "APPROVE") && (
+          <div style={{ fontSize: "12px", color: "#166534", backgroundColor: "#f0fdf4", padding: "10px", borderRadius: "6px", fontWeight: "600", border: "1px solid #86efac" }}>
+            ✅ INFO: Profil {profil.toUpperCase()} terakhir berstatus OK (Trial ke-{lastTrialData?.trial}). Pilih Edit untuk mengubah data atau Input Baru untuk menambah trial.
+          </div>
+        )}
 
         {isEditMode && <div style={{ fontSize: "12px", color: "#2563eb", backgroundColor: "#eff6ff", padding: "10px", borderRadius: "6px", fontWeight: "600", border: "1px solid #bfdbfe" }}>ℹ️ MODE EDIT AKTIF: Anda mengubah data lama. Klik simpan untuk MENIMPA data lama di baris #{targetId}.</div>}
 
@@ -230,7 +267,14 @@ function FormInput({ onDataSaved, existingData = [] }) {
 
           <button type="submit" style={{ ...btnSubmitStyle, backgroundColor: isEditMode ? "#2563eb" : isLockedBySystem ? "#b91c1c" : "#1e293b", flex: 2 }}>{isEditMode ? "Update Data Terkini" : isLockedBySystem ? `Simpan Sebagai Trial Ke-${trial}` : "Simpan Data Baru"}</button>
 
-          {isLockedBySystem && <button type="button" onClick={handleBukaGembok} style={{ ...btnSubmitStyle, backgroundColor: "#64748b", flex: 1 }}>Edit Profil</button>}
+          {/* ✅ Tombol Edit muncul di poka-yoke untuk NG dan OK */}
+          {isLockedBySystem && (
+            <button type="button" onClick={handleEditDariPokaYoke} style={{ ...btnSubmitStyle, backgroundColor: "#2563eb", flex: 1 }}>
+              ✏️ Edit Trial {lastTrialData?.trial}
+            </button>
+          )}
+
+          {isLockedBySystem && <button type="button" onClick={handleBukaGembok} style={{ ...btnSubmitStyle, backgroundColor: "#64748b", flex: 1 }}>Input Baru</button>}
 
           {(isEditMode || isManualBypass) && <button type="button" onClick={resetFormTotal} style={{ ...btnSubmitStyle, backgroundColor: "#dc2626", flex: 1 }}>Batal Edit / Reset</button>}
 
@@ -251,4 +295,4 @@ const btnSubmitStyle = { color: "white", border: "none", padding: "12px", border
 
 
 
-export default FormInput; 
+export default FormInput;
